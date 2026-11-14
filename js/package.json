@@ -1,0 +1,13 @@
+{
+  "name": "schatten-js",
+  "version": "1.0.0",
+  "description": "JavaScript-Kern der Schattensimulation (Port des Python-Kerns)",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "geotiff": "^2.1.3"
+  },
+  "type": "module",
+  "private": true
+}

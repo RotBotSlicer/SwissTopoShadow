@@ -1,5 +1,7 @@
 // Sonnenstand nach NOAA (Meeus-Näherung) – 1:1-Port von schatten/sun.py.
 // Azimut: Grad ab Norden im Uhrzeigersinn. Höhe: Grad, scheinbar (inkl. Refraktion).
+import { lv95ToWgs84, gridBearingOfNorth } from './coords.js';
+
 const DEG = Math.PI / 180;
 
 export function refractionDeg(e) {
@@ -45,3 +47,10 @@ export function sunPosition(unixS, latDeg, lonDeg, apparent = true) {
 }
 
 function mod(a, n) { return ((a % n) + n) % n; }
+
+/** Sonnenstand im LV95-Gitter: Azimut ab Gitter-Nord (inkl. Meridiankonvergenz), Höhe. */
+export function sunPositionLv95(unixS, E, N, apparent = true) {
+  const { lat, lon } = lv95ToWgs84(E, N);
+  const p = sunPosition(unixS, lat, lon, apparent);
+  return { az: mod(p.az + gridBearingOfNorth(E, N), 360), el: p.el };
+}

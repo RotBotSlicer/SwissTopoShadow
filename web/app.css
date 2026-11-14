@@ -1,0 +1,29 @@
+:root { --fg:#1d2420; --mut:#5d6a62; --bg:#f6f5f0; --ac:#c8641e; --line:#dcdcd2; }
+* { box-sizing: border-box; }
+html, body { margin:0; height:100%; font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--fg); }
+#map { position:fixed; inset:0; background:#e8e6df; }
+#sheet {
+  position:fixed; left:0; right:0; bottom:0; z-index:1000; max-height:62vh; overflow:auto;
+  background:var(--bg); border-top-left-radius:16px; border-top-right-radius:16px;
+  box-shadow:0 -4px 18px rgba(0,0,0,.18); padding:6px 14px calc(10px + env(safe-area-inset-bottom));
+}
+#sheet.collapsed { max-height:150px; overflow:hidden; }
+.grip { width:42px; height:5px; border-radius:3px; background:#c8c8be; margin:2px auto 8px; cursor:pointer; }
+.bar { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+input[type=date], select { font:inherit; padding:7px 8px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--fg); }
+input[type=date] { flex:1; min-width:0; }
+input[type=range] { flex:1; accent-color:var(--ac); }
+button { font:inherit; padding:7px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--fg); cursor:pointer; white-space:nowrap; }
+button.pri { background:var(--ac); color:#fff; border-color:var(--ac); font-weight:600; flex:1; }
+button:disabled { opacity:.5; }
+#play { width:42px; padding:7px 0; }
+.tnum { font-variant-numeric:tabular-nums; min-width:3.2em; text-align:right; font-weight:600; }
+.mut { color:var(--mut); } .small { font-size:.8rem; }
+.big { font-size:1.35rem; font-weight:700; margin:.1rem 0; }
+#point { border-top:1px solid var(--line); padding-top:8px; margin-top:4px; }
+#chart { width:100%; height:auto; display:block; margin-top:4px; }
+#legend { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--mut); margin-bottom:6px; }
+#legend .ramp { flex:1; height:10px; border-radius:5px; }
+.foot { margin-top:8px; }
+.leaflet-container { font:inherit; }
+.leaflet-top.leaflet-left { top:env(safe-area-inset-top); }

@@ -8,7 +8,8 @@ drop(r) = r² / (2R) · (1 - k) berücksichtigt Erdkrümmung und terrestrische
 Refraktion (k ≈ 0.13).
 
 Ein Ort ist besonnt, wenn die (scheinbare) Sonnenhöhe über dem Horizontwinkel
-in Sonnenrichtung liegt. Die Horizontkarte (n_az Richtungen je Pixel) wird
+in Sonnenrichtung liegt. Alle Azimute hier sind Gitterazimute (LV95); der
+Sonnenazimut wird dafür mit coords.sun_position_lv95 umgerechnet. Die Horizontkarte (n_az Richtungen je Pixel) wird
 einmal gerechnet; danach ist der Schatten für jede Sonnenposition nur noch
 eine Interpolation in Azimutrichtung.
 """
@@ -16,7 +17,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .sun import sun_position
+from .coords import sun_position_lv95
 
 R_EARTH = 6371000.0
 K_REFRACTION = 0.13
@@ -113,9 +114,12 @@ def lit_from_horizon(hmap, sun_el, sun_az):
     return sun_el > horizon_at(hmap, sun_az)
 
 
-def lit_timeline(az_deg, horizon_deg, unix_s, lat, lon):
-    """Für einen Punkt mit Horizontprofil: besonnt je Zeitpunkt."""
-    saz, sel = sun_position(unix_s, lat, lon)
+def lit_timeline(az_deg, horizon_deg, unix_s, E, N):
+    """Für einen Punkt (E, N) mit Horizontprofil (Gitterazimute): besonnt je Zeitpunkt.
+
+    Rückgabe: lit, Sonnenazimut (Gitter), Sonnenhöhe, Horizont in Sonnenrichtung.
+    """
+    saz, sel = sun_position_lv95(unix_s, E, N)
     hz = np.interp(saz, az_deg, horizon_deg, period=360.0)
     return (sel > hz) & (sel > -0.833), saz, sel, hz
 
@@ -135,9 +139,12 @@ def intervals(unix_s, flags):
     return out
 
 
-def sun_hours_map(hmap, unix_day, lat, lon, step_min=5.0):
-    """Stunden direkter Sonne je Pixel über die Zeitpunkte unix_day (Schritt step_min)."""
-    saz, sel = sun_position(unix_day, lat, lon)
+def sun_hours_map(hmap, unix_day, E, N, step_min=5.0):
+    """Stunden direkter Sonne je Pixel über die Zeitpunkte unix_day (Schritt step_min).
+
+    (E, N): Bezugsort für den Sonnenstand (z. B. Mitte des Ausschnitts).
+    """
+    saz, sel = sun_position_lv95(unix_day, E, N)
     acc = np.zeros(hmap.shape[1:], np.float32)
     for a, e in zip(saz, sel):
         if e > -0.833:

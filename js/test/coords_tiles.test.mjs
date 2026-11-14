@@ -26,3 +26,9 @@ test('decodeTile identisch mit Python', async () => {
     else assert.equal(out[i], ref[i]);
   }
 });
+
+import { gridBearingOfNorth } from '../src/coords.js';
+test('Meridiankonvergenz wie Python/pyproj (< 0.01°)', () => {
+  const ref = JSON.parse(readFileSync(fx('convergence.json')));
+  for (const [E, N, g] of ref) assert.ok(Math.abs(gridBearingOfNorth(E, N) - g) < 0.01, `${E}/${N}: ${gridBearingOfNorth(E, N)} vs ${g}`);
+});

@@ -1,5 +1,6 @@
 // Horizont, Schatten, Sonnenzeiten – Port von schatten/horizon.py (CPU-Referenz).
-import { sunPosition } from './sun.js';
+// Alle Azimute sind Gitterazimute (LV95); Sonnenstand über sunPositionLv95.
+import { sunPositionLv95 } from './sun.js';
 
 export const R_EARTH = 6371000;
 export const K_REFRACTION = 0.13;
@@ -90,10 +91,10 @@ export function litDirect(terrain, grid, sunEl, sunAz, { eye = 1.0, rMax = 15000
   return out;
 }
 
-/** Punkt mit Horizontprofil (azDeg aufsteigend, 0..360): besonnt je Zeitpunkt. */
-export function litTimeline(azDeg, horizonDeg, unixS, lat, lon) {
+/** Punkt (E, N) mit Horizontprofil (Gitterazimute aufsteigend, 0..360): besonnt je Zeitpunkt. */
+export function litTimeline(azDeg, horizonDeg, unixS, E, N) {
   return Array.from(unixS, u => {
-    const { az, el } = sunPosition(u, lat, lon);
+    const { az, el } = sunPositionLv95(u, E, N);
     return el > interpPeriodic(az, azDeg, horizonDeg) && el > -0.833;
   });
 }
@@ -122,11 +123,11 @@ export function intervals(times, flags) {
   return out;
 }
 
-/** Stunden direkter Sonne je Pixel für Zeitpunkte unixDay (Schritt stepMin). */
-export function sunHoursMap(hmap, nAz, unixDay, lat, lon, stepMin = 5) {
+/** Stunden direkter Sonne je Pixel für Zeitpunkte unixDay (Schritt stepMin); (E, N) = Bezugsort für die Sonne. */
+export function sunHoursMap(hmap, nAz, unixDay, E, N, stepMin = 5) {
   const n = hmap.length / nAz, acc = new Float32Array(n), h = new Float32Array(n);
   for (const u of unixDay) {
-    const { az, el } = sunPosition(u, lat, lon);
+    const { az, el } = sunPositionLv95(u, E, N);
     if (el <= -0.833) continue;
     horizonAt(hmap, nAz, az, h);
     for (let i = 0; i < n; i++) if (el > h[i]) acc[i] += stepMin / 60;

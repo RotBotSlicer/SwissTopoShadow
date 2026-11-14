@@ -10,6 +10,10 @@ Ist die Rechenbasis der Web-App.
 - `tiles.js` – Kachelpyramide des Grobmodells lesen (`Pyramid`, `decodeTile`; gzip via `DecompressionStream`).
 - `loaders.js` – swissALTI3D 2 m (STAC + GeoTIFF), swissALTIRegio 10 m (COG per HTTP-Range), `loadTerrainLod`.
 - `horizon.js` – `pointHorizon`, `horizonMap`, `litDirect`, `litFromHorizon`, `litTimeline`, `intervals`, `sunHoursMap`.
+- `gpu.js` – `ShadowRenderer` (WebGL2): Schatten je Sonnenstand und Sonnenstunden, gleiches Verfahren wie `litDirect`.
+  Im Browser-Test (`tools/test_gpu.py`) 100 % gleiche Pixel wie die CPU, synthetisch und mit echten Daten.
+- `area.js` – Rechengitter für einen Kartenausschnitt (Web-Mercator-Pixel mit LV95-Koordinaten).
+- `sun.js` zusätzlich `sunPositionLv95` (Azimut im LV95-Gitter, inkl. Meridiankonvergenz).
 
 Abhängigkeit: `geotiff` (GeoTIFF/COG lesen).
 
@@ -22,7 +26,7 @@ Ergebnisse (14.11.2026):
 - Sonnenstand, Rasterabtastung, Kacheldekodierung: identisch mit Python (Rundung float32).
 - Synthetisches Gelände: Horizont/Horizontkarte < 0.01° Abweichung, Schattenpixel ≥ 99.5 % gleich.
 - Bösbächibach mit echten swisstopo-Daten (2 m live, 10 m live aus COG, Pyramide lokal):
-  max. Horizontabweichung zu Python 0.0005°, Sonne 10:08–10:50.
+  max. Horizontabweichung zu Python 0.0005°, Sonne 10:08–10:56.
 
 ## Laufzeit (CPU, Node, ein Kern)
 ~35 Mio. Geländeabtastungen/s. Ein Strahl bis 30 km hat ~600 Schritte (growth 1 %).

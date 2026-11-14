@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>GPU-Test</title>
+<script type="importmap">{ "imports": { "geotiff": "../../../web/vendor/geotiff.js" } }</script>
+</head><body><pre id="out">läuft…</pre>
+<script type="module">
+// Vergleicht die WebGL-Schattenberechnung mit der CPU-Referenz (litDirect).
+import { Raster, Terrain } from '../../src/raster.js';
+import { litDirect } from '../../src/horizon.js';
+import { ShadowRenderer } from '../../src/gpu.js';
+import { Pyramid } from '../../src/tiles.js';
+import { loadTerrainLod } from '../../src/loaders.js';
+import { sunPositionLv95 } from '../../src/sun.js';
+
+const results = [];
+const log = s => { results.push(s); document.getElementById('out').textContent = results.map(r => JSON.stringify(r)).join('\n'); };
+const agree = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] === b[i]; return s / a.length; };
+
+async function synthetic() {
+  const f = await (await fetch('../fixtures/horizon_syn.json')).json();
+  const levels = await Promise.all(f.levels.map(async (m, i) => {
+    const b = await (await fetch(`../fixtures/syn_level${i}.f32`)).arrayBuffer();
+    return { raster: new Raster(new Float32Array(b), m.w, m.h, m.x0, m.y0, m.res), until: m.until ?? Infinity };
+  }));
+  const terrain = new Terrain(levels);
+  const gr = new ShadowRenderer(document.createElement('canvas'));
+  gr.setTerrain(terrain, { E: f.E0, N: f.N0 });
+  const grid = { x0: f.E0 - 1000, y0: f.N0 + 1000, res: 10, w: 200, h: 200 };
+  gr.setGrid(grid);
+  const opts = { eye: 1.0, rMax: 2800, growth: 0.01 };
+  for (const [el, az] of [[5, 120], [12, 150], [20, 181], [8, 233], [3, 95], [30, 200], [-3, 180]]) {
+    const t = performance.now();
+    const g = gr.litMask(az, el, opts);
+    const ms = performance.now() - t;
+    const c = litDirect(terrain, grid, el, az, opts);
+    log({ test: 'synthetisch', el, az, agree: agree(g, c), lit: c.reduce((a, b) => a + b, 0) / c.length, gpu_ms: Math.round(ms) });
+  }
+  // Sonnenstunden: GPU-Summe vs. CPU-Summe von litDirect
+  const small = { x0: f.E0 - 500, y0: f.N0 + 500, res: 25, w: 40, h: 40 };
+  gr.setGrid(small);
+  const suns = []; for (let k = 0; k < 60; k++) suns.push({ az: 100 + k * 2.6, el: 2 + 25 * Math.sin(Math.PI * k / 59) });
+  const gh = gr.sunHours(suns, 10, opts);
+  const ch = new Float32Array(small.w * small.h);
+  for (const s of suns) { const m = litDirect(terrain, small, s.el, s.az, opts); m.forEach((v, i) => { ch[i] += v * 10 / 60; }); }
+  let d = 0; gh.forEach((v, i) => { d = Math.max(d, Math.abs(v - ch[i])); });
+  log({ test: 'sonnenstunden', maxdiff_h: d });
+}
+
+async function real() {
+  const E = 2719286, N = 1203098;
+  const pyr = await Pyramid.open('../../../data/pyramid');
+  const area = [E - 500, N - 500, E + 500, N + 500];
+  const terrain = await loadTerrainLod(area, pyr, { rMax: 30000 });
+  const gr = new ShadowRenderer(document.createElement('canvas'));
+  gr.setTerrain(terrain, { E, N });
+  const grid = { x0: E - 500, y0: N + 500, res: 10, w: 100, h: 100 };
+  gr.setGrid(grid);
+  for (const hhmm of ['09:00', '10:30', '12:30', '14:30']) {
+    const u = Date.parse(`2026-11-14T${hhmm}:00+01:00`) / 1000;
+    const { az, el } = sunPositionLv95(u, E, N);
+    const t = performance.now();
+    const g = gr.litMask(az, el, { rMax: 30000 });
+    const ms = performance.now() - t;
+    const c = litDirect(terrain, grid, el, az, { rMax: 30000 });
+    log({ test: 'bösbächi', hhmm, agree: agree(g, c), lit: c.reduce((a, b) => a + b, 0) / c.length, gpu_ms: Math.round(ms) });
+  }
+  // Laufzeit für einen grossen Ausschnitt (wie in der App)
+  const big = { x0: E - 500, y0: N + 500, res: 2, w: 500, h: 500 };
+  gr.setGrid(big);
+  const u = Date.parse('2026-11-14T12:30:00+01:00') / 1000, s = sunPositionLv95(u, E, N);
+  gr.litMask(s.az, s.el, { rMax: 30000 });
+  const t = performance.now(); gr.litMask(s.az, s.el, { rMax: 30000 });
+  log({ test: 'laufzeit 500x500', gpu_ms: Math.round(performance.now() - t) });
+}
+
+try { await synthetic(); if (location.hash === '#real') await real(); log('FERTIG'); }
+catch (e) { log({ error: String(e.stack || e) }); log('FERTIG'); }
+window.__results = results;
+</script></body></html>

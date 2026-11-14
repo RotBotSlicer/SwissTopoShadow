@@ -31,7 +31,10 @@ gzip, `{res}m/{ty}_{tx}.bin.gz`, `manifest.json`. Gesamt ~126 MB (40 m: 2268, 80
 Neu bauen: `python tools/build_pyramid.py <ordner>` (~8 min).
 
 ## Konventionen
-LV95 (EPSG:2056) in Metern; Azimut ab Norden im Uhrzeigersinn; Zeiten intern Unix-Sekunden (UTC).
+LV95 (EPSG:2056) in Metern; Zeiten intern Unix-Sekunden (UTC).
+Azimute im Horizont sind **Gitterazimute** (ab LV95-Gitter-Nord). Der Sonnenazimut (ab geografisch Nord)
+wird mit `coords.sun_position_lv95` um die Meridiankonvergenz gedreht (Bern 0°, Glarus −1.14°, Engadin bis −2.2°).
+Ohne diese Korrektur lagen die Sonnenzeiten am Referenzpunkt um 6 min daneben.
 Augenhöhe: Punkt 1.7 m, Karten 1.0 m über Gelände.
 
 ## Tests
@@ -42,7 +45,7 @@ Augenhöhe: Punkt 1.7 m, Karten 1.0 m über Gelände.
 
 Synthetische Tests: Ebene, Wand (analytischer Winkel), schiefe Ebene, fein/grob-Umschaltung,
 Horizontkarte vs. direkter Strahl (> 98 % gleiche Pixel).
-Referenzfall: Bösbächibach 2'719'286 / 1'203'098, 14.11.2026 → Sonne 10:08–10:50, um 12:30 Schatten (beobachtet).
+Referenzfall: Bösbächibach 2'719'286 / 1'203'098, 14.11.2026 → Sonne 10:08–10:56, um 12:30 Schatten (beobachtet).
 
 ## Beispiel
     python examples/punkt_tagesverlauf.py 2719286 1203098 2026-11-14

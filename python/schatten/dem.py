@@ -17,12 +17,7 @@ STAC = "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissal
 NODATA_Z = -1.0e4  # Ersatzwert: liegt so tief, dass er nie Schatten wirft
 
 
-def lv95_to_wgs84(E, N):
-    from pyproj import Transformer
-
-    tr = Transformer.from_crs(2056, 4326, always_xy=True)
-    lon, lat = tr.transform(E, N)
-    return lat, lon
+from .coords import lv95_to_wgs84  # noqa: E402,F401  (Kompatibilität)
 
 
 @dataclass

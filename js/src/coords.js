@@ -14,3 +14,10 @@ export function wgs84ToLv95(lat, lon) {
     N: 1200147.07 + 308807.95 * p + 3745.25 * l * l + 76.63 * p * p - 194.56 * l * l * p + 119.79 * p ** 3,
   };
 }
+
+/** Gitterazimut [°] von geografisch Nord am Ort (E, N) – Meridiankonvergenz (Vorzeichen: Azimut_Gitter = Azimut_geo + g). */
+export function gridBearingOfNorth(E, N, d = 0.001) {
+  const { lat, lon } = lv95ToWgs84(E, N);
+  const a = wgs84ToLv95(lat, lon), b = wgs84ToLv95(lat + d, lon);
+  return Math.atan2(b.E - a.E, b.N - a.N) * 180 / Math.PI;
+}

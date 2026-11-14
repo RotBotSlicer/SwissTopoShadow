@@ -39,10 +39,10 @@ test('litDirect und litFromHorizon = Python (≥ 99.5 % Pixel)', () => {
 });
 
 test('sunHoursMap = Python (± 1 Zeitschritt)', () => {
-  const sh = sunHoursMap(hm, 36, f.u, 46.97, 9.0, 5);
+  const sh = sunHoursMap(hm, 36, f.u, f.shEN[0], f.shEN[1], 5);
   let d = 0;
   for (let i = 0; i < sh.length; i++) d = Math.max(d, Math.abs(sh[i] - f.sh[i]));
-  assert.ok(d <= 5 / 60 + 1e-6, `max diff ${d} h`);
+  assert.ok(d <= 5 / 60 + 1e-4, `max diff ${d} h`); // float32-Summation
 });
 
 test('interpPeriodic wie numpy.interp(period=360)', () => {

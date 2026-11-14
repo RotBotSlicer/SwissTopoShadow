@@ -2,182 +2,58 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Schatten – Sonnenzeiten am Punkt</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Schatten – swisstopo</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2712%27 r=%276%27 fill=%27%23e8820c%27/%3E%3Cpath d=%27M0 32 L12 16 L18 23 L23 18 L32 32Z%27 fill=%27%236b7d5c%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="./app.css">
 <script type="importmap">
 { "imports": { "geotiff": "./vendor/geotiff.js" } }
 </script>
-<style>
-  :root { --fg:#1d2420; --mut:#5d6a62; --bg:#f6f5f0; --card:#fff; --ac:#c8641e; --ok:#2e7d4f; --bad:#b3261e; --line:#dcdcd2; }
-  * { box-sizing: border-box; }
-  body { margin:0; font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--fg); background:var(--bg); }
-  main { max-width:720px; margin:0 auto; padding:16px; }
-  h1 { font-size:1.35rem; margin:.2rem 0 .1rem; }
-  .sub { color:var(--mut); margin:0 0 1rem; font-size:.92rem; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
-  label { display:block; font-size:.8rem; color:var(--mut); margin-bottom:2px; }
-  input { width:100%; font:inherit; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; }
-  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
-  .btns { display:flex; gap:8px; flex-wrap:wrap; }
-  button { font:inherit; padding:10px 14px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; }
-  button.pri { background:var(--ac); color:#fff; border-color:var(--ac); font-weight:600; }
-  button:disabled { opacity:.5; }
-  ul.steps { list-style:none; padding:0; margin:0; font-size:.92rem; }
-  ul.steps li { padding:4px 0; display:flex; gap:8px; }
-  .st { width:1.2em; text-align:center; flex:none; }
-  .ok { color:var(--ok); } .bad { color:var(--bad); } .mut { color:var(--mut); }
-  .big { font-size:1.6rem; font-weight:700; margin:.2rem 0; }
-  svg { width:100%; height:auto; display:block; }
-  footer { color:var(--mut); font-size:.8rem; margin-top:16px; }
-  code { font-size:.85em; }
-</style>
+<script src="./vendor/leaflet/leaflet.js"></script>
 </head>
 <body>
-<main>
-  <h1>Sonnenzeiten am Punkt</h1>
-  <p class="sub">Direkte Sonne über den Tag, berechnet aus den swisstopo-Höhenmodellen (Gelände ohne Wald und Gebäude).</p>
+<div id="map"></div>
 
-  <div class="card">
-    <div class="row">
-      <div><label for="e">Ost (LV95)</label><input id="e" inputmode="numeric" value="2719286"></div>
-      <div><label for="n">Nord (LV95)</label><input id="n" inputmode="numeric" value="1203098"></div>
-    </div>
-    <div class="row">
-      <div><label for="d">Datum</label><input id="d" type="date" value="2026-11-14"></div>
-      <div><label for="eye">Augenhöhe [m]</label><input id="eye" inputmode="decimal" value="1.7"></div>
-    </div>
-    <div class="btns">
-      <button class="pri" id="go">Berechnen</button>
-      <button id="gps">Mein Standort</button>
-      <button id="today">Heute</button>
+<div id="sheet">
+  <div class="grip" id="grip"></div>
+  <div id="timebox" hidden>
+    <div class="bar">
+      <button id="play" aria-label="Abspielen">▶</button>
+      <input id="time" type="range" min="0" max="1" step="1" value="0" aria-label="Uhrzeit">
+      <span id="timelbl" class="tnum">--:--</span>
     </div>
   </div>
+  <div class="bar">
+    <input id="date" type="date" aria-label="Datum">
+    <button id="today" title="Heute">Heute</button>
+    <button id="locate" title="Mein Standort" aria-label="Mein Standort">◎</button>
+  </div>
 
-  <div class="card" id="res" hidden>
+  <div id="area-box">
+    <div class="bar">
+      <button id="area" class="pri">Schatten für Ausschnitt</button>
+      <select id="mode" aria-label="Anzeige">
+        <option value="shadow">Schatten</option>
+        <option value="hours">Sonnenstunden</option>
+      </select>
+    </div>
+    <div id="legend" hidden></div>
+    <div id="area-status" class="mut small"></div>
+  </div>
+
+  <div id="point" hidden>
     <div class="mut" id="where"></div>
     <div class="big" id="summary"></div>
     <div id="ivs"></div>
-    <svg id="chart" viewBox="0 0 640 260" aria-label="Horizont und Sonnenbahn"></svg>
+    <svg id="chart" viewBox="0 0 640 240" aria-label="Horizont und Sonnenbahn"></svg>
   </div>
+  <div id="hint" class="mut">Tippe auf die Karte, um die Sonnenzeiten an einem Ort zu sehen.</div>
+  <div id="status" class="mut small"></div>
+  <div class="foot small mut">Karte und Höhendaten © swisstopo · Gelände ohne Wald und Gebäude ·
+    <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a></div>
+</div>
 
-  <div class="card">
-    <strong>Datenquellen</strong>
-    <ul class="steps" id="steps"></ul>
-  </div>
-
-  <footer>
-    Höhendaten: © swisstopo (swissALTI3D, swissALTIRegio). Grobmodell daraus abgeleitet.
-    Quellcode: <a href="https://github.com/RotBotSlicer/SwissTopoShadow">GitHub</a>.
-  </footer>
-</main>
-
-<script type="module">
-import { Pyramid } from './lib/tiles.js';
-import { loadAlti3d, loadRegio, LOD_DEFAULT } from './lib/loaders.js';
-import { Terrain } from './lib/raster.js';
-import { pointHorizon, litTimeline, intervals } from './lib/horizon.js';
-import { sunPosition } from './lib/sun.js';
-import { lv95ToWgs84, wgs84ToLv95 } from './lib/coords.js';
-
-const $ = id => document.getElementById(id);
-const steps = $('steps');
-const fmtTime = u => new Date(u * 1000).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' });
-
-function step(text) {
-  const li = document.createElement('li');
-  li.innerHTML = `<span class="st mut">…</span><span>${text}</span>`;
-  steps.append(li);
-  const t0 = performance.now();
-  return {
-    ok(extra = '') { li.firstChild.textContent = '✓'; li.firstChild.className = 'st ok'; li.lastChild.textContent += ` – ${((performance.now() - t0) / 1000).toFixed(1)} s ${extra}`; },
-    fail(err) { li.firstChild.textContent = '✗'; li.firstChild.className = 'st bad'; li.lastChild.textContent += ` – Fehler: ${err.message || err}`; },
-  };
-}
-
-async function run() {
-  const E = +$('e').value, N = +$('n').value, eye = +$('eye').value || 1.7;
-  const day = $('d').value;
-  if (!(E > 2400000 && E < 2900000 && N > 1000000 && N < 1350000)) { alert('Koordinaten bitte in LV95 (z. B. 2719286 / 1203098)'); return; }
-  $('go').disabled = true; steps.innerHTML = ''; $('res').hidden = true;
-  const rMax = 30000, lod = LOD_DEFAULT;
-  const grow = m => [E - m, N - m, E + m, N + m];
-  try {
-    let s = step('Grobmodell (Kacheln 40/80/160 m)');
-    const pyr = await Pyramid.open('./data/pyramid');
-    const pyrRasters = await Promise.all(lod.pyramid.map(([res, until]) => pyr.raster(res, grow(Math.min(until, rMax) + res))));
-    s.ok();
-    s = step('swissALTI3D 2 m (Kacheln von swisstopo)');
-    const fine = await loadAlti3d(grow(lod.fineUntil));
-    s.ok(`(${fine.w * fine.h / 250000} km²)`);
-    s = step('swissALTIRegio 10 m (Teilabfrage aus COG)');
-    const regio = await loadRegio(grow(lod.regioUntil));
-    s.ok();
-    const terrain = new Terrain([
-      { raster: fine, until: lod.fineUntil }, { raster: regio, until: lod.regioUntil },
-      ...pyrRasters.map((raster, i) => ({ raster, until: lod.pyramid[i][1] })),
-    ]);
-    s = step('Horizont rechnen (1440 Richtungen, 30 km)');
-    await new Promise(r => setTimeout(r, 30));
-    const az = Array.from({ length: 1440 }, (_, i) => i * 0.25);
-    const h = pointHorizon(terrain, E, N, az, { eye, rMax });
-    s.ok();
-    show(E, N, day, az, h, terrain.fine.sample(E, N));
-  } catch (err) {
-    console.error(err);
-    step('Abbruch').fail(err);
-  } finally { $('go').disabled = false; }
-}
-
-function show(E, N, day, az, h, z) {
-  const { lat, lon } = lv95ToWgs84(E, N);
-  // Tagesbeginn in Zürcher Zeit -> Unix
-  const noonUtc = Date.parse(`${day}T12:00:00Z`) / 1000;
-  const off = (new Date(noonUtc * 1000).toLocaleString('en-US', { timeZone: 'Europe/Zurich', hour12: false, hour: '2-digit' }) - 12) * 3600;
-  const t0 = noonUtc - 12 * 3600 - off;
-  const times = Array.from({ length: 1440 }, (_, i) => t0 + 60 * i);
-  const lit = litTimeline(az, h, times, lat, lon);
-  const iv = intervals(times, lit);
-  const mins = lit.filter(Boolean).length;
-  $('where').textContent = `${Math.round(E)} / ${Math.round(N)}, ${Math.round(z)} m ü. M. – ${new Date(day).toLocaleDateString('de-CH')}`;
-  $('summary').textContent = mins ? `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, '0')} min Sonne` : 'Keine direkte Sonne';
-  $('ivs').innerHTML = iv.map(([a, b]) => `☀︎ ${fmtTime(a)} – ${fmtTime(b)}`).join('<br>');
-  drawChart(az, h, times, lat, lon, lit);
-  $('res').hidden = false;
-}
-
-function drawChart(az, h, times, lat, lon, lit) {
-  const W = 640, H = 260, L = 34, B = 26, T = 8, R = 8;
-  const maxEl = Math.max(30, ...times.map(u => sunPosition(u, lat, lon).el)) + 5;
-  const x = a => L + (a - 45) / 270 * (W - L - R), y = e => H - B - Math.max(0, e) / maxEl * (H - B - T);
-  let d = `M${x(45)},${y(0)}`;
-  az.forEach((a, i) => { if (a >= 45 && a <= 315) d += ` L${x(a).toFixed(1)},${y(h[i]).toFixed(1)}`; });
-  d += ` L${x(315)},${y(0)} Z`;
-  let sun = '', sunLit = '', ticks = '';
-  times.forEach((u, i) => {
-    const { az: a, el } = sunPosition(u, lat, lon);
-    if (el < -0.5 || a < 45 || a > 315) return;
-    const p = `${x(a).toFixed(1)},${y(el).toFixed(1)}`;
-    sun += (sun ? ' L' : 'M') + p;
-    if (lit[i]) sunLit += `<circle cx="${x(a)}" cy="${y(el)}" r="3" fill="#e8820c"/>`;
-    const dt = new Date(u * 1000), hh = +dt.toLocaleString('en-US', { timeZone: 'Europe/Zurich', hour: '2-digit', hour12: false });
-    if (dt.getUTCMinutes() === 0) ticks += `<text x="${x(a)}" y="${y(el) - 6}" font-size="12" text-anchor="middle" fill="#3d4a42">${hh}h</text>`;
-  });
-  let axes = '';
-  for (const [a, lbl] of [[90, 'O'], [135, 'SO'], [180, 'S'], [225, 'SW'], [270, 'W']]) axes += `<text x="${x(a)}" y="${H - 8}" font-size="11" text-anchor="middle" fill="#5d6a62">${lbl}</text>`;
-  for (let e = 0; e <= maxEl; e += 10) axes += `<text x="${L - 5}" y="${y(e) + 4}" font-size="10" text-anchor="end" fill="#5d6a62">${e}°</text><line x1="${L}" x2="${W - R}" y1="${y(e)}" y2="${y(e)}" stroke="#eee"/>`;
-  $('chart').innerHTML = `${axes}<path d="${d}" fill="#8a9a78" opacity=".85"/><path d="${sun}" fill="none" stroke="#d9822b" stroke-width="1.5" stroke-dasharray="5 3"/>${sunLit}${ticks}`;
-}
-
-$('go').onclick = run;
-$('today').onclick = () => { $('d').value = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Zurich' }); };
-$('gps').onclick = () => {
-  if (!navigator.geolocation) return alert('Standort nicht verfügbar');
-  navigator.geolocation.getCurrentPosition(p => {
-    const { E, N } = wgs84ToLv95(p.coords.latitude, p.coords.longitude);
-    $('e').value = Math.round(E); $('n').value = Math.round(N);
-  }, err => alert('Standort: ' + err.message), { enableHighAccuracy: true, timeout: 15000 });
-};
-</script>
+<script type="module" src="./app.js"></script>
 </body>
 </html>

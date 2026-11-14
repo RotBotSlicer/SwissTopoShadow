@@ -91,3 +91,21 @@ def test_sun_window_boesbaechi_with_surface(terrain_lod):
     lit, *_ = lit_timeline(az, h, u, E, N)
     fmt = lambda x: pd.Timestamp(x, unit="s", tz="UTC").tz_convert("Europe/Zurich").strftime("%H:%M")
     assert [f"{fmt(a)}–{fmt(b)}" for a, b in intervals(u, lit)] == ["10:14–10:16", "10:20–10:50"]
+
+
+def test_sun_window_boesbaechi_world_copernicus():
+    """Weltweit-Modus am selben Ort: Copernicus 30 m in lokaler TM (09:42–10:49, swisstopo: 10:08–10:56)."""
+    from schatten.coords import local_tm
+    from schatten.world import load_terrain_world
+
+    lat, lon = 46.968236, 9.006193
+    p = local_tm(round(lat, 4), round(lon, 4))
+    e, n = p.from_latlon(lat, lon)
+    t = load_terrain_world((e - 50, n - 50, e + 50, n + 50), p, r_max=30000)
+    az = np.arange(0, 360, 0.25)
+    h = point_horizon(t, e, n, az, eye=1.7, r_max=30000)
+    tt = pd.date_range("2026-11-14 06:00", "2026-11-14 18:00", freq="1min", tz="Europe/Zurich")
+    u = to_unix(tt)
+    lit, *_ = lit_timeline(az, h, u, e, n, p)
+    fmt = lambda x: pd.Timestamp(x, unit="s", tz="UTC").tz_convert("Europe/Zurich").strftime("%H:%M")
+    assert [f"{fmt(a)}–{fmt(b)}" for a, b in intervals(u, lit)] == ["09:42–10:49"]

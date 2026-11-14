@@ -16,12 +16,12 @@ import numpy as np
 
 from .dem import Raster, Terrain
 
-COP30 = "https://copernicus-dem-30m.s3.amazonaws.com"
+COP30 = "https://opentopography.s3.sdsc.edu/raster/COP30/COP30_hh"  # Kopie mit CORS (AWS-Kopie ohne)
 LOD_WORLD = ((30, 0, 6000.0), (60, 1, 12000.0), (120, 2, math.inf))  # (res, Übersicht, bis)
 
 
 def cop30_tile_name(lat_s: int, lon_w: int) -> str:
-    return (f"Copernicus_DSM_COG_10_{'S' if lat_s < 0 else 'N'}{abs(lat_s):02d}_00_"
+    return (f"Copernicus_DSM_10_{'S' if lat_s < 0 else 'N'}{abs(lat_s):02d}_00_"
             f"{'W' if lon_w < 0 else 'E'}{abs(lon_w):03d}_00_DEM")
 
 
@@ -51,7 +51,7 @@ def load_geo_tiles(south, west, north, east, overview=0, base=COP30):
 
     def one(la, lo):
         name = cop30_tile_name(la, lo)
-        url = f"/vsicurl/{base}/{name}/{name}.tif"
+        url = f"/vsicurl/{base}/{name}.tif"
         try:
             full = rasterio.open(url)
         except Exception:

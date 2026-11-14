@@ -4,8 +4,8 @@ import { cop30TileName, sampleGeo, resampleToGrid, geoBoundsOf, lodWorldForPixel
 import { localTM } from '../src/coords.js';
 
 test('Kachelnamen Copernicus GLO-30', () => {
-  assert.equal(cop30TileName(46, 9), 'Copernicus_DSM_COG_10_N46_00_E009_00_DEM');
-  assert.equal(cop30TileName(-34, -71), 'Copernicus_DSM_COG_10_S34_00_W071_00_DEM');
+  assert.equal(cop30TileName(46, 9), 'Copernicus_DSM_10_N46_00_E009_00_DEM');
+  assert.equal(cop30TileName(-34, -71), 'Copernicus_DSM_10_S34_00_W071_00_DEM');
 });
 
 // synthetische Kachel: z = 1000 + 2000*(lat-46) + 500*(lon-9) (linear -> bilinear exakt)

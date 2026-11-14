@@ -1,10 +1,11 @@
-// Weltweites Gelände: Copernicus DEM GLO-30 (30 m, Oberflächenmodell, frei) als Cloud-Optimized GeoTIFFs auf AWS.
+// Weltweites Gelände: Copernicus DEM GLO-30 (30 m, Oberflächenmodell, frei), Kopie bei OpenTopography (SDSC).
+// Die AWS-Kopie erlaubt keinen Browserzugriff (kein CORS); die OpenTopography-Kopie schon.
 // Die 1°×1°-Kacheln liegen in geografischen Koordinaten; für die Rechnung wird daraus ein Metergitter in einer
 // lokalen Transversalen Mercator (coords.localTM) gebildet. Übersichtsstufen des COG liefern die groben Levels.
 import { fromUrl } from 'geotiff';
 import { Raster, Terrain } from './raster.js';
 
-export const COP30 = 'https://copernicus-dem-30m.s3.amazonaws.com';
+export const COP30 = 'https://opentopography.s3.sdsc.edu/raster/COP30/COP30_hh';
 
 /** Levels weltweit: 30 m bis 6 km, 60 m bis 12 km, 120 m darüber (Faustregel Auflösung ≤ 1 % der Distanz). */
 export const LOD_WORLD = [
@@ -16,13 +17,20 @@ export const LOD_WORLD = [
 const pad = (v, n) => String(v).padStart(n, '0');
 /** Kachelname für die Kachel mit Südwestecke (latS, lonW) (ganze Grad). */
 export function cop30TileName(latS, lonW) {
-  return `Copernicus_DSM_COG_10_${latS < 0 ? 'S' : 'N'}${pad(Math.abs(latS), 2)}_00_${lonW < 0 ? 'W' : 'E'}${pad(Math.abs(lonW), 3)}_00_DEM`;
+  return `Copernicus_DSM_10_${latS < 0 ? 'S' : 'N'}${pad(Math.abs(latS), 2)}_00_${lonW < 0 ? 'W' : 'E'}${pad(Math.abs(lonW), 3)}_00_DEM`;
 }
 
 const tiffCache = new Map();
-async function openTile(base, latS, lonW) {
-  const name = cop30TileName(latS, lonW), url = `${base}/${name}/${name}.tif`;
-  if (!tiffCache.has(url)) tiffCache.set(url, fromUrl(url, { allowFullFile: false }).catch(() => null)); // fehlt = Meer
+async function openTile(base, latS, lonW, fetchFn = fetch) {
+  const url = `${base}/${cop30TileName(latS, lonW)}.tif`;
+  if (!tiffCache.has(url)) {
+    tiffCache.set(url, (async () => {
+      const r = await fetchFn(url, { headers: { Range: 'bytes=0-0' } });
+      if (r.status === 404 || r.status === 403) return null; // keine Kachel = Meer
+      if (!r.ok) throw new Error(`Copernicus ${r.status}`);
+      return fromUrl(url, { allowFullFile: false });
+    })().catch(e => { tiffCache.delete(url); throw e; }));
+  }
   return tiffCache.get(url);
 }
 

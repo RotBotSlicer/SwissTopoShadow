@@ -52,3 +52,23 @@ test('Bösbächibach mit Wald/Gebäude (1 m/2 m Oberfläche): JS = Python, Sonne
   console.log('# Sonne mit Oberfläche:', txt);
   assert.equal(txt, '10:14–10:16, 10:20–10:50');
 });
+
+import { loadTerrainWorld } from '../src/copernicus.js';
+import { localTM } from '../src/coords.js';
+test('Weltweit (Copernicus, lokale TM) Bösbächibach: JS = Python', { skip: !on && 'SCHATTEN_NETWORK=1 nicht gesetzt', timeout: 600000 }, async () => {
+  const ref = JSON.parse(readFileSync(new URL('./fixtures/boesbaechi_world_py.json', import.meta.url)));
+  const p = localTM(ref.lat0, ref.lon0), { E: e, N: n } = p.fromLatLon(ref.lat, ref.lon);
+  const terrain = await loadTerrainWorld([e - 50, n - 50, e + 50, n + 50], p, { rMax: 30000 });
+  const h = pointHorizon(terrain, e, n, ref.az, { eye: 1.7, rMax: 30000 });
+  let d = 0;
+  h.forEach((v, i) => { d = Math.max(d, Math.abs(v - ref.h[i])); });
+  console.log(`# max |JS - Python| Horizont weltweit: ${d.toFixed(5)}°`);
+  assert.ok(d < 0.01, `max diff ${d}`);
+  const t0 = Date.UTC(2026, 10, 14, 5, 0) / 1000;
+  const times = Array.from({ length: 12 * 60 }, (_, i) => t0 + 60 * i);
+  const iv = intervals(times, litTimeline(ref.az, h, times, e, n, p));
+  const hhmm = u => new Date((u + 3600) * 1000).toISOString().slice(11, 16);
+  const txt = iv.map(([a, b]) => `${hhmm(a)}–${hhmm(b)}`).join(', ');
+  console.log('# Sonne weltweit:', txt);
+  assert.equal(txt, '09:42–10:49');
+});

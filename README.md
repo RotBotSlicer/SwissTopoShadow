@@ -6,9 +6,9 @@ Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhen
 - **Schatten für Ausschnitt:** Schatten über der Landeskarte mit Zeitschieber und Animation,
   oder Sonnenstunden des Tages als Farbkarte. Gerechnet auf der Grafikkarte (WebGL2).
 - **Gebiet Schweiz / Weltweit (Schalter):** Schweiz mit swisstopo (Landeskarte, Gelände bis 2 m, Wald).
-  Weltweit mit offenen Daten: Copernicus DEM GLO-30 (30 m, Oberflächenmodell) und OpenTopoMap; gerechnet in einer
-  lokalen Transversalen Mercator um den Ausschnitt, Zeiten in der Zeitzone des Ortes (tz-lookup).
-  Status: in Erprobung (Datenzugriff aus dem Browser noch zu bestätigen).
+  Weltweit mit offenen Daten: Copernicus DEM GLO-30 (30 m, Oberflächenmodell; Kopie bei OpenTopography, weil die
+  AWS-Kopie keinen Browserzugriff erlaubt) und OpenTopoMap; gerechnet in einer lokalen Transversalen Mercator um den
+  Ausschnitt, Zeiten in der Zeitzone des Ortes (tz-lookup).
 - **Wald und Gebäude (Schalter):** swissSURFACE3D im Nahbereich bis 1 km (Ausschnitt 2 m, Punkt 1 m bis 300 m).
   Der Standort bleibt am Boden (swissALTI3D + Augenhöhe), die Strahlen treffen Kronen und Dächer.
   Nur bei feinem Gelände (Ausschnitt bis ca. 3 km).
@@ -43,6 +43,17 @@ der Shader rechnet ihn je Pixel linear nach (40 km: 99.9–100 % gleich wie exak
     cd js && npm install && npm test
     python tools/test_gpu.py [--real]       # WebGL-Schatten vs. CPU-Referenz in Headless-Chrome (100 % gleiche Pixel)
     tools/build_site.sh && python tools/e2e_app.py   # ganze App im Browser
+
+## Weltweit: wie genau? (Vergleich mit swisstopo an Schweizer Orten, 14.11. / 21.12. / 21.6.)
+| Ort | Copernicus 30 m | swisstopo |
+|---|---|---|
+| Zermatt, 14.11. | 10:29–15:29 | 10:34–15:28 |
+| Davos, 14.11. | 08:23–10:08, 10:34–15:55 | 08:24–10:07, 10:35–15:55 |
+| Lauterbrunnen, 21.6. | 10:59–16:06 | 10:59–16:42 |
+| Bösbächibach (Graben), 14.11. | 09:42–10:49 | 10:08–10:56 |
+
+In offenem Gelände meist auf wenige Minuten genau; in engen Tälern, Gräben und an Felswänden (30-m-Raster,
+Oberflächenmodell mit Wald) bis eine halbe Stunde daneben.
 
 ## Wald und Gebäude: Hinweise
 - Bäume erscheinen so, wie sie bei der Befliegung waren (am Testort 2017). Laubbäume werfen auch im Winter vollen Schatten.

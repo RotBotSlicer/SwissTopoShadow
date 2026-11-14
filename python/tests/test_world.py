@@ -15,8 +15,8 @@ def tile(lat0, lon0, w, h):
 
 
 def test_tile_names():
-    assert cop30_tile_name(46, 9) == "Copernicus_DSM_COG_10_N46_00_E009_00_DEM"
-    assert cop30_tile_name(-34, -71) == "Copernicus_DSM_COG_10_S34_00_W071_00_DEM"
+    assert cop30_tile_name(46, 9) == "Copernicus_DSM_10_N46_00_E009_00_DEM"
+    assert cop30_tile_name(-34, -71) == "Copernicus_DSM_10_S34_00_W071_00_DEM"
 
 
 def test_sample_geo_interior_and_border():

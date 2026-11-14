@@ -32,3 +32,16 @@ test('Meridiankonvergenz wie Python/pyproj (< 0.01°)', () => {
   const ref = JSON.parse(readFileSync(fx('convergence.json')));
   for (const [E, N, g] of ref) assert.ok(Math.abs(gridBearingOfNorth(E, N) - g) < 0.01, `${E}/${N}: ${gridBearingOfNorth(E, N)} vs ${g}`);
 });
+
+import { sunPositionLv95, sunPositionLv95Grad } from '../src/sun.js';
+test('Sonnenstand-Gradient: lineare Näherung über ±25 km < 0.02°', () => {
+  const E = 2719286, N = 1203098;
+  for (const iso of ['2026-11-14T08:00:00Z', '2026-11-14T11:30:00Z', '2026-06-21T17:00:00Z']) {
+    const u = Date.parse(iso) / 1000, s = sunPositionLv95Grad(u, E, N);
+    for (const [dE, dN] of [[25000, 0], [0, -25000], [-18000, 18000]]) {
+      const t = sunPositionLv95(u, E + dE, N + dN);
+      const az = s.az + s.grad.azE * dE + s.grad.azN * dN, el = s.el + s.grad.elE * dE + s.grad.elN * dN;
+      assert.ok(Math.abs(((az - t.az + 540) % 360) - 180) < 0.02 && Math.abs(el - t.el) < 0.02, `${iso} ${dE}/${dN}`);
+    }
+  }
+});

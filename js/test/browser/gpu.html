@@ -8,8 +8,8 @@ import { Raster, Terrain } from '../../src/raster.js';
 import { litDirect } from '../../src/horizon.js';
 import { ShadowRenderer } from '../../src/gpu.js';
 import { Pyramid } from '../../src/tiles.js';
-import { loadTerrainLod } from '../../src/loaders.js';
-import { sunPositionLv95 } from '../../src/sun.js';
+import { loadTerrainLod, LOD_DEFAULT, LOD_10M, LOD_40M } from '../../src/loaders.js';
+import { sunPositionLv95, sunPositionLv95Grad } from '../../src/sun.js';
 
 const results = [];
 const log = s => { results.push(s); document.getElementById('out').textContent = results.map(r => JSON.stringify(r)).join('\n'); };
@@ -72,7 +72,60 @@ async function real() {
   log({ test: 'laufzeit 500x500', gpu_ms: Math.round(performance.now() - t) });
 }
 
-try { await synthetic(); if (location.hash === '#real') await real(); log('FERTIG'); }
+// Wie stark ändert sich der Schatten, wenn das feinste Gelände gröber wird? (Referenz: 2 m)
+async function lodCompare() {
+  const E = 2719286, N = 1203098, half = 1500;
+  const pyr = await Pyramid.open('../../../data/pyramid');
+  const area = [E - half, N - half, E + half, N + half];
+  const masks = {};
+  for (const [name, lod] of [['2m', LOD_DEFAULT], ['10m', LOD_10M], ['40m', LOD_40M]]) {
+    const terrain = await loadTerrainLod(area, pyr, { rMax: 30000, lod });
+    for (const px of [10, 40]) {
+      const gr = new ShadowRenderer(document.createElement('canvas'));
+      gr.setTerrain(terrain, { E, N });
+      gr.setGrid({ x0: E - half, y0: N + half, res: px, w: 2 * half / px, h: 2 * half / px });
+      for (const hhmm of ['09:30', '11:00', '12:30', '14:30', '15:30']) {
+        const u = Date.parse(`2026-11-14T${hhmm}:00+01:00`) / 1000;
+        const { az, el } = sunPositionLv95(u, E, N);
+        masks[`${name}|${px}|${hhmm}`] = gr.litMask(az, el, { rMax: 30000 });
+      }
+    }
+  }
+  for (const px of [10, 40]) for (const name of ['10m', '40m']) {
+    let s = 0, n = 0, worst = 1;
+    for (const hhmm of ['09:30', '11:00', '12:30', '14:30', '15:30']) {
+      const a = masks[`2m|${px}|${hhmm}`], b = masks[`${name}|${px}|${hhmm}`];
+      const ag = agree(a, b); worst = Math.min(worst, ag); s += ag * a.length; n += a.length;
+    }
+    log({ test: 'lod-vergleich', pixel_m: px, gelaende: name, gleich_mittel: +(s / n).toFixed(4), gleich_min: +worst.toFixed(4) });
+  }
+}
+
+// Grosser Ausschnitt (40 km, 40-m-Gelände): GPU mit Sonnen-Gradient vs. CPU mit exakter Sonne je Pixel
+async function bigArea() {
+  const E = 2719286, N = 1203098, half = 20000, px = 1000;
+  const pyr = await Pyramid.open('../../../data/pyramid');
+  const terrain = await loadTerrainLod([E - half, N - half, E + half, N + half], pyr, { rMax: 30000, lod: LOD_40M });
+  const gr = new ShadowRenderer(document.createElement('canvas'));
+  gr.setTerrain(terrain, { E, N });
+  const grid = { x0: E - half, y0: N + half, res: px, w: 2 * half / px, h: 2 * half / px };
+  gr.setGrid(grid);
+  for (const hhmm of ['08:30', '12:30', '16:00']) {
+    const u = Date.parse(`2026-11-14T${hhmm}:00+01:00`) / 1000;
+    const s = sunPositionLv95Grad(u, E, N);
+    const g = gr.litMask(s.az, s.el, { rMax: 30000, grad: s.grad });
+    const g0 = gr.litMask(s.az, s.el, { rMax: 30000 });
+    const c = new Uint8Array(grid.w * grid.h);
+    for (let i = 0; i < c.length; i++) {
+      const r = Math.floor(i / grid.w), col = i % grid.w;
+      const pe = grid.x0 + (col + 0.5) * px, pn = grid.y0 - (r + 0.5) * px, t = sunPositionLv95(u, pe, pn);
+      c[i] = litDirect(terrain, { x0: pe - px / 2, y0: pn + px / 2, res: px, w: 1, h: 1 }, t.el, t.az, { rMax: 30000 })[0];
+    }
+    log({ test: 'gross-gradient', hhmm, agree: agree(g, c), ohne_gradient: agree(g0, c) });
+  }
+}
+
+try { await synthetic(); if (location.hash === '#real') { await real(); await bigArea(); await lodCompare(); } log('FERTIG'); }
 catch (e) { log({ error: String(e.stack || e) }); log('FERTIG'); }
 window.__results = results;
 </script></body></html>

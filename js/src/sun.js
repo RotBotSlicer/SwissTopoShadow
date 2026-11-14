@@ -54,3 +54,12 @@ export function sunPositionLv95(unixS, E, N, apparent = true) {
   const p = sunPosition(unixS, lat, lon, apparent);
   return { az: mod(p.az + gridBearingOfNorth(E, N), 360), el: p.el };
 }
+
+/** Sonnenstand am Ort (E, N) plus lineare Änderung pro Meter (für grosse Ausschnitte), d = Schrittweite [m]. */
+export function sunPositionLv95Grad(unixS, E, N, d = 2000) {
+  const c = sunPositionLv95(unixS, E, N);
+  const e1 = sunPositionLv95(unixS, E + d, N), e0 = sunPositionLv95(unixS, E - d, N);
+  const n1 = sunPositionLv95(unixS, E, N + d), n0 = sunPositionLv95(unixS, E, N - d);
+  const da = (a, b) => ((a - b + 540) % 360) - 180;
+  return { ...c, grad: { azE: da(e1.az, e0.az) / (2 * d), azN: da(n1.az, n0.az) / (2 * d), elE: (e1.el - e0.el) / (2 * d), elN: (n1.el - n0.el) / (2 * d) } };
+}

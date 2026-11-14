@@ -26,5 +26,5 @@ bad = False
 for r in res:
     print(json.dumps(r, ensure_ascii=False))
     if isinstance(r, dict):
-        bad |= "error" in r or r.get("agree", 1) < 0.995 or r.get("maxdiff_h", 0) > 10 / 60 + 1e-6
+        bad |= "error" in r or (r.get("test") != "lod-vergleich" and r.get("agree", 1) < 0.995) or r.get("maxdiff_h", 0) > 10 / 60 + 1e-6
 sys.exit(1 if bad else 0)

@@ -18,8 +18,9 @@ uniform float uRes[${MAX_LEVELS}];
 uniform float uUntil[${MAX_LEVELS}];
 uniform ivec2 uSize[${MAX_LEVELS}];
 uniform int uNL, uMode;
-uniform vec2 uDir;
-uniform float uTanEl, uEye, uRMax, uGrowth, uAccScale;
+uniform float uAz, uEl;          // Sonne am Bezugspunkt [rad], Azimut im LV95-Gitter
+uniform vec2 uAzG, uElG;          // Änderung je Meter (E, N) – für grosse Ausschnitte
+uniform float uEye, uRMax, uGrowth, uAccScale;
 uniform vec4 uShadow;
 out vec4 o;
 const float NOD = ${NODATA_Z.toFixed(1)};
@@ -68,8 +69,11 @@ void main() {
     return;
   }
   vec2 p = texelFetch(uCoord, px, 0).xy;
+  float az = uAz + dot(uAzG, p), el = uEl + dot(uElG, p);
+  vec2 uDir = vec2(sin(az), cos(az));
+  float uTanEl = tan(el);
   float z0 = sampleL(0, p) + uEye;
-  bool lit = uTanEl > -0.0175; // Sonne unter ca. -1°: Nacht
+  bool lit = el > -0.0175; // Sonne unter ca. -1°: Nacht
   float r = uRes[0];
   for (int k = 0; k < 8192 && lit; k++) {
     if (r > uRMax) break;
@@ -163,10 +167,11 @@ export class ShadowRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
-  _sun(sunAz, sunEl, { eye = 1.0, rMax = 30000, growth = 0.01 } = {}) {
-    const gl = this.gl, a = sunAz * Math.PI / 180;
-    gl.uniform2f(this.u.uDir, Math.sin(a), Math.cos(a));
-    gl.uniform1f(this.u.uTanEl, sunEl <= -1 ? -1 : Math.tan(sunEl * Math.PI / 180));
+  /** grad: {azE, azN, elE, elN} in Grad pro Meter (Sonnenstand variiert über grosse Ausschnitte), Standard 0. */
+  _sun(sunAz, sunEl, { eye = 1.0, rMax = 30000, growth = 0.01, grad = null } = {}) {
+    const gl = this.gl, D = Math.PI / 180, g = grad ?? { azE: 0, azN: 0, elE: 0, elN: 0 };
+    gl.uniform1f(this.u.uAz, sunAz * D); gl.uniform1f(this.u.uEl, sunEl * D);
+    gl.uniform2f(this.u.uAzG, g.azE * D, g.azN * D); gl.uniform2f(this.u.uElG, g.elE * D, g.elN * D);
     gl.uniform1f(this.u.uEye, eye); gl.uniform1f(this.u.uRMax, rMax); gl.uniform1f(this.u.uGrowth, growth);
   }
 
@@ -212,7 +217,7 @@ export class ShadowRenderer {
     const gl = this.gl;
     if (this.accSteps + suns.length > 255) throw new Error('max. 255 Zeitschritte');
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-    for (const s of suns) { if (s.el > -1) { this._sun(s.az, s.el, opts); this._draw(2, true); this.accSteps++; } }
+    for (const s of suns) { if (s.el > -1.5) { this._sun(s.az, s.el, { ...opts, grad: s.grad ?? opts.grad }); this._draw(2, true); this.accSteps++; } }
     gl.disable(gl.BLEND);
   }
 

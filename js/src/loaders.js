@@ -6,8 +6,22 @@ import { lv95ToWgs84 } from './coords.js';
 export const STAC = 'https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d/items';
 export const REGIO_COG = 'https://data.geo.admin.ch/ch.swisstopo.swissaltiregio/swissaltiregio/swissaltiregio_2056_5728.tif';
 
-/** Level-Grenzen (gemessen, siehe README des Python-Kerns). */
-export const LOD_DEFAULT = { fineUntil: 1000, regioUntil: 4000, pyramid: [[40, 12000], [80, 24000], [160, Infinity]] };
+/**
+ * Gelände-Levels: Quelle und Distanzgrenze (gemessen, siehe README des Python-Kerns).
+ * src: 'alti3d' (2 m, live) | 'regio' (10 m, live aus COG) | 'pyramid' (res 40/80/160 m, eigene Kacheln)
+ */
+const PYR = [{ src: 'pyramid', res: 40, until: 12000 }, { src: 'pyramid', res: 80, until: 24000 }, { src: 'pyramid', res: 160, until: Infinity }];
+export const LOD_DEFAULT = [{ src: 'alti3d', until: 1000 }, { src: 'regio', until: 4000 }, ...PYR];
+export const LOD_10M = [{ src: 'regio', until: 4000 }, ...PYR];
+export const LOD_40M = PYR;
+
+/**
+ * Feinstes Gelände passend zur Pixelgrösse p [m] eines Ausschnitts: Gelände feiner als die Pixel
+ * bringt kaum etwas, kostet aber quadratisch Daten. Bis 4 m: 2 m, bis 15 m: 10 m, sonst 40 m.
+ */
+export function lodForPixelSize(p) {
+  return p <= 4 ? LOD_DEFAULT : p <= 15 ? LOD_10M : LOD_40M;
+}
 
 /** Neueste swissALTI3D-Kachel (2 m) je km² im Rechteck -> Map(tileId -> url). */
 export async function findAlti3dTiles([xmin, ymin, xmax, ymax], fetchFn = fetch) {
@@ -79,16 +93,14 @@ export async function loadRegio([xmin, ymin, xmax, ymax], url = REGIO_COG) {
   return new Raster(z, w, h, X0 + c0 * res, Y0 - r0 * res, res);
 }
 
-/** Gelände wie im Python-Kern (load_terrain_lod): 2 m -> 10 m -> Pyramide. */
+/** Gelände wie im Python-Kern (load_terrain_lod): Levels gemäss lod (Standard 2 m -> 10 m -> Pyramide). */
 export async function loadTerrainLod([xmin, ymin, xmax, ymax], pyramid, { rMax = 30000, lod = LOD_DEFAULT, fetchFn = fetch, onProgress } = {}) {
   const grow = m => [xmin - m, ymin - m, xmax + m, ymax + m];
-  const [fine, regio, ...pyr] = await Promise.all([
-    loadAlti3d(grow(lod.fineUntil), fetchFn, onProgress),
-    loadRegio(grow(lod.regioUntil)),
-    ...lod.pyramid.map(([res, until]) => pyramid.raster(res, grow(Math.min(until, rMax) + res))),
-  ]);
-  return new Terrain([
-    { raster: fine, until: lod.fineUntil }, { raster: regio, until: lod.regioUntil },
-    ...pyr.map((raster, i) => ({ raster, until: lod.pyramid[i][1] })),
-  ]);
+  const rasters = await Promise.all(lod.map(({ src, res, until }) => {
+    const b = grow(Math.min(until, rMax) + (res ?? 10));
+    if (src === 'alti3d') return loadAlti3d(grow(until), fetchFn, onProgress);
+    if (src === 'regio') return loadRegio(b);
+    return pyramid.raster(res, b);
+  }));
+  return new Terrain(rasters.map((raster, i) => ({ raster, until: lod[i].until })));
 }

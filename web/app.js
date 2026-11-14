@@ -1,14 +1,15 @@
 // Web-App: Karte (swisstopo), Ort antippen -> Sonnenzeiten; Ausschnitt -> Schatten über den Tag (WebGL).
 import { Pyramid } from './lib/tiles.js';
-import { loadTerrainLod } from './lib/loaders.js';
+import { loadTerrainLod, lodForPixelSize, LOD_DEFAULT } from './lib/loaders.js';
 import { pointHorizon, litTimeline, intervals } from './lib/horizon.js';
-import { sunPositionLv95 } from './lib/sun.js';
+import { sunPositionLv95, sunPositionLv95Grad } from './lib/sun.js';
 import { lv95ToWgs84, wgs84ToLv95 } from './lib/coords.js';
 import { mercatorGrid, gridSizeFor } from './lib/area.js';
 import { ShadowRenderer } from './lib/gpu.js';
 
 const $ = id => document.getElementById(id);
-const R_MAX = 30000, STEP_MIN = 5, MAX_AREA_M = 3200, TZ = 'Europe/Zurich';
+const R_MAX = 30000, STEP_MIN = 5, MAX_AREA_M = 50000, GRID_PX = 900, TZ = 'Europe/Zurich';
+const lodName = lod => (lod[0].src === 'alti3d' ? '2 m' : lod[0].src === 'regio' ? '10 m' : `${lod[0].res} m`);
 const fmtTime = u => new Date(u * 1000).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 const status = t => { $('status').textContent = t; };
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
@@ -20,7 +21,7 @@ L.control.zoom({ position: 'topright' }).addTo(map);
 const wmts = (layer, fmt, opts = {}) => L.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${fmt}`,
   { maxZoom: 19, maxNativeZoom: 18, attribution: '© <a href="https://www.swisstopo.admin.ch">swisstopo</a>', ...opts });
 wmts('ch.swisstopo.pixelkarte-farbe', 'jpeg').addTo(map);
-wmts('ch.swisstopo.swisstlm3d-wanderwege', 'png', { opacity: 0.9, attribution: '' }).addTo(map);
+wmts('ch.swisstopo.swisstlm3d-wanderwege', 'png', { opacity: 0.9, attribution: '', minZoom: 13 }).addTo(map);
 map.on('moveend', () => { const c = map.getCenter(); store.set('view', { lat: c.lat, lon: c.lng, z: map.getZoom() }); updateAreaButton(); });
 
 // Leaflet-Ebene, die ein <canvas> statt eines Bildes zeigt (wie L.ImageOverlay)
@@ -60,7 +61,8 @@ async function showPoint(lat, lon) {
   expand();
   try {
     let terrain = area?.terrain;
-    const inArea = terrain && E > area.grid.bboxLv95[0] && E < area.grid.bboxLv95[2] && N > area.grid.bboxLv95[1] && N < area.grid.bboxLv95[3];
+    // Gelände des Ausschnitts nur wiederverwenden, wenn es das feine 2-m-Modell enthält
+    const inArea = terrain && area.lod === LOD_DEFAULT && E > area.grid.bboxLv95[0] && E < area.grid.bboxLv95[2] && N > area.grid.bboxLv95[1] && N < area.grid.bboxLv95[3];
     if (!inArea) {
       status('Lade Höhendaten für den Punkt…');
       terrain = await loadTerrainLod([E - 50, N - 50, E + 50, N + 50], await pyramid(), { rMax: R_MAX });
@@ -109,39 +111,42 @@ function drawChart(az, h, times, E, N, lit) {
 map.on('click', e => showPoint(e.latlng.lat, e.latlng.lng));
 
 // ------------------------------------------------------------ Ausschnitt / Schatten
-let area = null, renderer = null, overlay = null, suns = [], playing = false, hours = null;
+let area = null, renderer = null, overlay = null, suns = [], playing = false, hours = null, selectedMinute = null;
 
 function viewBounds() {
   const b = map.getBounds();
   return { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
 }
 function updateAreaButton() {
-  const s = gridSizeFor(viewBounds());
+  const b = viewBounds(), s = gridSizeFor(b, 3, GRID_PX);
   const big = Math.max(s.widthM, s.heightM) > MAX_AREA_M;
+  const px = Math.max(s.widthM / s.w, s.heightM / s.h);
   $('area').disabled = big;
-  $('area').textContent = big ? 'Für Schatten näher zoomen' : (area ? 'Schatten neu für Ausschnitt' : 'Schatten für Ausschnitt');
+  $('area').textContent = big ? 'Für Schatten näher zoomen'
+    : `Schatten berechnen (${lodName(lodForPixelSize(px))})`;
 }
 
 async function computeArea() {
-  const b = viewBounds(), { w, h } = gridSizeFor(b, 3, 900);
+  const b = viewBounds(), { w, h } = gridSizeFor(b, 3, GRID_PX);
   const grid = mercatorGrid(b, w, h);
+  const lod = lodForPixelSize(grid.pixelSize);
   $('area').disabled = true;
   try {
     $('area-status').textContent = 'Lade Höhendaten…';
     const terrain = await loadTerrainLod(grid.bboxLv95, await pyramid(), {
-      rMax: R_MAX, onProgress: (n, tot) => { $('area-status').textContent = `Lade 2-m-Kacheln ${n}/${tot}…`; },
+      rMax: R_MAX, lod, onProgress: (n, tot) => { $('area-status').textContent = `Lade 2-m-Kacheln ${n}/${tot}…`; },
     });
     $('area-status').textContent = 'Bereite Grafikkarte vor…';
     const canvas = overlay?._image ?? document.createElement('canvas');
     renderer ??= new ShadowRenderer(canvas);
     renderer.setTerrain(terrain, grid.center);
     renderer.setGrid(grid);
-    area = { grid, terrain };
+    area = { grid, terrain, lod };
     hours = null;
     if (overlay) overlay.setBounds([[b.south, b.west], [b.north, b.east]]);
     else overlay = new CanvasOverlay(canvas, [[b.south, b.west], [b.north, b.east]], { opacity: 1, interactive: false }).addTo(map);
     prepareDay();
-    $('area-status').textContent = `${w}×${h} Pixel à ${grid.pixelSize.toFixed(1)} m`;
+    $('area-status').textContent = `${w}×${h} Pixel à ${grid.pixelSize.toFixed(1)} m · Gelände ${lodName(lod)}`;
     $('sheet').classList.add('collapsed'); // Karte freigeben, Zeitschieber bleibt sichtbar
   } catch (e) {
     console.error(e); $('area-status').textContent = 'Fehler: ' + e.message;
@@ -153,15 +158,16 @@ function prepareDay() {
   const t0 = dayStart($('date').value), { E, N } = area.grid.center;
   suns = [];
   for (let m = 0; m < 1440; m += STEP_MIN) {
-    const u = t0 + 60 * m, s = sunPositionLv95(u, E, N);
-    if (s.el > -1) suns.push({ u, ...s });
+    const u = t0 + 60 * m, s = sunPositionLv95Grad(u, E, N);
+    if (s.el > -1.5) suns.push({ u, ...s });
   }
   $('timebox').hidden = false;
   const tEl = $('time');
   tEl.max = Math.max(0, suns.length - 1);
-  const now = Date.now() / 1000;
-  const iNow = suns.findIndex(s => s.u >= now);
-  tEl.value = iNow > 0 ? iNow : Math.floor(suns.length / 2);
+  // gleiche Uhrzeit wie bisher beibehalten, sonst jetzt, sonst Mittag
+  const keep = selectedMinute ?? ((Date.now() / 1000 - t0) / 60);
+  const i = suns.findIndex(s => (s.u - t0) / 60 >= keep);
+  tEl.value = i > 0 ? i : Math.floor(suns.length / 2);
   hours = null;
   draw();
 }
@@ -184,7 +190,8 @@ function draw() {
     }
     const s = suns[+$('time').value];
     if (!s) return;
-    renderer.renderShadow(s.az, s.el, { rMax: R_MAX });
+    renderer.renderShadow(s.az, s.el, { rMax: R_MAX, grad: s.grad });
+    selectedMinute = (s.u - dayStart($('date').value)) / 60;
     $('timelbl').textContent = fmtTime(s.u);
   });
 }

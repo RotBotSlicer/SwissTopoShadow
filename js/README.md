@@ -8,12 +8,14 @@ Ist die Rechenbasis der Web-App.
 - `coords.js` – LV95 ↔ WGS84 (swisstopo-Näherungsformeln, < 5 m in ganz CH).
 - `raster.js` – `Raster` (bilinear, Randverhalten wie scipy), `Terrain` (Level of Detail mit Rückfall).
 - `tiles.js` – Kachelpyramide des Grobmodells lesen (`Pyramid`, `decodeTile`; gzip via `DecompressionStream`).
-- `loaders.js` – swissALTI3D 2 m (STAC + GeoTIFF), swissALTIRegio 10 m (COG per HTTP-Range), `loadTerrainLod`.
+- `loaders.js` – swissALTI3D 2 m (STAC + GeoTIFF), swissALTIRegio 10 m (COG per HTTP-Range), `loadTerrainLod`,
+  Level-Schemata `LOD_DEFAULT` / `LOD_10M` / `LOD_40M` und `lodForPixelSize`.
 - `horizon.js` – `pointHorizon`, `horizonMap`, `litDirect`, `litFromHorizon`, `litTimeline`, `intervals`, `sunHoursMap`.
 - `gpu.js` – `ShadowRenderer` (WebGL2): Schatten je Sonnenstand und Sonnenstunden, gleiches Verfahren wie `litDirect`.
   Im Browser-Test (`tools/test_gpu.py`) 100 % gleiche Pixel wie die CPU, synthetisch und mit echten Daten.
 - `area.js` – Rechengitter für einen Kartenausschnitt (Web-Mercator-Pixel mit LV95-Koordinaten).
-- `sun.js` zusätzlich `sunPositionLv95` (Azimut im LV95-Gitter, inkl. Meridiankonvergenz).
+- `sun.js` zusätzlich `sunPositionLv95` (Azimut im LV95-Gitter, inkl. Meridiankonvergenz) und
+  `sunPositionLv95Grad` (plus Änderung pro Meter für grosse Ausschnitte).
 
 Abhängigkeit: `geotiff` (GeoTIFF/COG lesen).
 

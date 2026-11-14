@@ -21,6 +21,12 @@ Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhen
 2 m swissALTI3D bis 1 km · 10 m swissALTIRegio bis 4 km · 40 m bis 12 km · 80 m bis 24 km · 160 m bis 30 km.
 Genauigkeit und Messungen: siehe `python/README.md`.
 
+Für Kartenausschnitte richtet sich das feinste Gelände nach der Pixelgrösse (max. 900 Pixel pro Seite,
+Ausschnitt bis 50 km): Pixel ≤ 4 m → ab 2 m, ≤ 15 m → ab 10 m, sonst ab 40 m. Gemessen am Glarner
+Testgebiet (3 × 3 km, 5 Tageszeiten, Referenz = mit 2 m): ab 10 m 98.5 % gleiche Schattenpixel, ab 40 m 95 %
+(Unterschiede an den Schattenrändern). Bei grossen Ausschnitten variiert der Sonnenstand über die Fläche;
+der Shader rechnet ihn je Pixel linear nach (40 km: 99.9–100 % gleich wie exakt je Pixel, ohne Korrektur 99.6 %).
+
 ## Lokal starten
     tools/build_site.sh
     python3 -m http.server -d _site 8000     # dann http://localhost:8000

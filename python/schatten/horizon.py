@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .coords import sun_position_lv95
+from .coords import sun_position_grid
 
 R_EARTH = 6371000.0
 K_REFRACTION = 0.13
@@ -114,12 +114,12 @@ def lit_from_horizon(hmap, sun_el, sun_az):
     return sun_el > horizon_at(hmap, sun_az)
 
 
-def lit_timeline(az_deg, horizon_deg, unix_s, E, N):
+def lit_timeline(az_deg, horizon_deg, unix_s, E, N, proj=None):
     """Für einen Punkt (E, N) mit Horizontprofil (Gitterazimute): besonnt je Zeitpunkt.
 
     Rückgabe: lit, Sonnenazimut (Gitter), Sonnenhöhe, Horizont in Sonnenrichtung.
     """
-    saz, sel = sun_position_lv95(unix_s, E, N)
+    saz, sel = sun_position_grid(unix_s, E, N, proj)
     hz = np.interp(saz, az_deg, horizon_deg, period=360.0)
     return (sel > hz) & (sel > -0.833), saz, sel, hz
 
@@ -139,12 +139,12 @@ def intervals(unix_s, flags):
     return out
 
 
-def sun_hours_map(hmap, unix_day, E, N, step_min=5.0):
+def sun_hours_map(hmap, unix_day, E, N, step_min=5.0, proj=None):
     """Stunden direkter Sonne je Pixel über die Zeitpunkte unix_day (Schritt step_min).
 
     (E, N): Bezugsort für den Sonnenstand (z. B. Mitte des Ausschnitts).
     """
-    saz, sel = sun_position_lv95(unix_day, E, N)
+    saz, sel = sun_position_grid(unix_day, E, N, proj)
     acc = np.zeros(hmap.shape[1:], np.float32)
     for a, e in zip(saz, sel):
         if e > -0.833:

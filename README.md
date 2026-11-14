@@ -5,6 +5,10 @@ Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhen
 - **Ort antippen:** Sonnenzeiten am Punkt, Diagramm Horizont gegen Sonnenbahn.
 - **Schatten für Ausschnitt:** Schatten über der Landeskarte mit Zeitschieber und Animation,
   oder Sonnenstunden des Tages als Farbkarte. Gerechnet auf der Grafikkarte (WebGL2).
+- **Gebiet Schweiz / Weltweit (Schalter):** Schweiz mit swisstopo (Landeskarte, Gelände bis 2 m, Wald).
+  Weltweit mit offenen Daten: Copernicus DEM GLO-30 (30 m, Oberflächenmodell) und OpenTopoMap; gerechnet in einer
+  lokalen Transversalen Mercator um den Ausschnitt, Zeiten in der Zeitzone des Ortes (tz-lookup).
+  Status: in Erprobung (Datenzugriff aus dem Browser noch zu bestätigen).
 - **Wald und Gebäude (Schalter):** swissSURFACE3D im Nahbereich bis 1 km (Ausschnitt 2 m, Punkt 1 m bis 300 m).
   Der Standort bleibt am Boden (swissALTI3D + Augenhöhe), die Strahlen treffen Kronen und Dächer.
   Nur bei feinem Gelände (Ausschnitt bis ca. 3 km).

@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="./vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="./app.css">
 <script type="importmap">
-{ "imports": { "geotiff": "./vendor/geotiff.js" } }
+{ "imports": { "geotiff": "./vendor/geotiff.js", "tz-lookup": "./vendor/tz-lookup.js" } }
 </script>
 <script src="./vendor/leaflet/leaflet.js"></script>
 </head>
@@ -25,6 +25,12 @@
     </div>
   </div>
   <div class="bar">
+    <div class="seg" role="radiogroup" aria-label="Gebiet">
+      <button id="reg-ch" role="radio">Schweiz</button><button id="reg-world" role="radio">Weltweit β</button>
+    </div>
+    <span id="region-info" class="mut small"></span>
+  </div>
+  <div class="bar">
     <input id="date" type="date" aria-label="Datum">
     <button id="today" title="Heute">Heute</button>
     <button id="locate" title="Mein Standort" aria-label="Mein Standort">◎</button>
@@ -38,7 +44,8 @@
         <option value="hours">Sonnenstunden</option>
       </select>
     </div>
-    <label class="check"><input type="checkbox" id="surface"> Wald und Gebäude <span class="mut small">(swissSURFACE3D, nur bei feinem Gelände)</span></label>
+    <label class="check" id="surface-row"><input type="checkbox" id="surface"> Wald und Gebäude <span class="mut small">(swissSURFACE3D, nur bei feinem Gelände)</span></label>
+    <div id="world-note" class="mut small" hidden>Weltweit: Copernicus-Höhenmodell 30 m (Oberfläche, Wald grob enthalten) · Karte OpenTopoMap</div>
     <div id="legend" hidden></div>
     <div id="area-status" class="mut small"></div>
   </div>
@@ -52,8 +59,7 @@
   </div>
   <div id="hint" class="mut">Tippe auf die Karte, um die Sonnenzeiten an einem Ort zu sehen.</div>
   <div id="status" class="mut small"></div>
-  <div class="foot small mut">Karte und Höhendaten © swisstopo · Gelände ohne Wald und Gebäude ·
-    <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a></div>
+  <div class="foot small mut" id="credits"></div>
 </div>
 
 <script type="module" src="./app.js"></script>

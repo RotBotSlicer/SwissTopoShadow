@@ -14,6 +14,10 @@ Ist die Rechenbasis der Web-App.
 - `horizon.js` – `pointHorizon`, `horizonMap`, `litDirect`, `litFromHorizon`, `litTimeline`, `intervals`, `sunHoursMap`.
 - `gpu.js` – `ShadowRenderer` (WebGL2): Schatten je Sonnenstand und Sonnenstunden, gleiches Verfahren wie `litDirect`.
   Im Browser-Test (`tools/test_gpu.py`) 100 % gleiche Pixel wie die CPU, synthetisch und mit echten Daten.
+- `copernicus.js` – weltweites Gelände aus Copernicus GLO-30 (COG-Kacheln 1°, Übersichtsstufen 60/120 m),
+  umgerechnet in ein Metergitter einer lokalen TM (`loadTerrainWorld`, `LOD_WORLD`, `lodWorldForPixelSize`).
+- `coords.js` zusätzlich `LV95` und `localTM(lat0, lon0)` (Transversale Mercator, Krüger-Reihen, < 1 mm gegenüber pyproj);
+  Sonnenstand, Horizont und Rechengitter nehmen eine Projektion als Parameter (Standard LV95).
 - `area.js` – Rechengitter für einen Kartenausschnitt (Web-Mercator-Pixel mit LV95-Koordinaten).
 - `sun.js` zusätzlich `sunPositionLv95` (Azimut im LV95-Gitter, inkl. Meridiankonvergenz) und
   `sunPositionLv95Grad` (plus Änderung pro Meter für grosse Ausschnitte).

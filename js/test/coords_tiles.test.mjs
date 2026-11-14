@@ -45,3 +45,27 @@ test('Sonnenstand-Gradient: lineare Näherung über ±25 km < 0.02°', () => {
     }
   }
 });
+
+import { localTM, LV95 } from '../src/coords.js';
+test('localTM = pyproj tmerc (< 1 mm), Hin- und Rückweg', () => {
+  for (const c of JSON.parse(readFileSync(fx('tm.json')))) {
+    const p = localTM(c.lat0, c.lon0);
+    let dF = 0, dI = 0;
+    c.lat.forEach((lat, i) => {
+      const q = p.fromLatLon(lat, c.lon[i]);
+      dF = Math.max(dF, Math.hypot(q.E - c.E[i], q.N - c.N[i]));
+      const r = p.toLatLon(c.E[i], c.N[i]);
+      dI = Math.max(dI, Math.hypot((r.lat - lat) * 111000, (r.lon - c.lon[i]) * 111000 * Math.cos(lat * Math.PI / 180)));
+    });
+    assert.ok(dF < 1e-3 && dI < 1e-3, `${c.lat0}/${c.lon0}: ${dF} ${dI}`);
+  }
+  assert.equal(LV95.fromLatLon(46.95, 7.44).E > 2.5e6, true);
+});
+
+test('Meridiankonvergenz localTM: 0 am Mittelmeridian, ~Δλ·sinφ daneben', () => {
+  const p = localTM(46.97, 9.0);
+  assert.ok(Math.abs(gridBearingOfNorth(0, 0, 0.001, p)) < 1e-6);
+  const { E, N } = p.fromLatLon(46.97, 9.4);
+  const g = gridBearingOfNorth(E, N, 0.001, p);
+  assert.ok(Math.abs(Math.abs(g) - 0.4 * Math.sin(46.97 * Math.PI / 180)) < 0.005, g);
+});

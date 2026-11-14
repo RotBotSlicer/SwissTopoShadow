@@ -1,25 +1,44 @@
-// Web-App: Karte (swisstopo), Ort antippen -> Sonnenzeiten; Ausschnitt -> Schatten über den Tag (WebGL).
+// Web-App: Karte, Ort antippen -> Sonnenzeiten; Ausschnitt -> Schatten über den Tag (WebGL).
+// Zwei Gebiete: Schweiz (swisstopo, hochauflösend, LV95) und Weltweit (Copernicus 30 m, OpenTopoMap, lokale TM).
 import { Pyramid } from './lib/tiles.js';
 import { loadTerrainLod, lodForPixelSize, withSurface, LOD_DEFAULT } from './lib/loaders.js';
+import { loadTerrainWorld, lodWorldForPixelSize } from './lib/copernicus.js';
 import { pointHorizon, litTimeline, intervals } from './lib/horizon.js';
-import { sunPositionLv95, sunPositionLv95Grad } from './lib/sun.js';
-import { lv95ToWgs84, wgs84ToLv95 } from './lib/coords.js';
+import { sunPositionGrid, sunPositionGridGrad } from './lib/sun.js';
+import { LV95, localTM } from './lib/coords.js';
 import { mercatorGrid, gridSizeFor } from './lib/area.js';
 import { ShadowRenderer } from './lib/gpu.js';
+import { tzlookup } from 'tz-lookup';
 
 const $ = id => document.getElementById(id);
-const R_MAX = 30000, STEP_MIN = 5, MAX_AREA_M = 50000, GRID_PX = 900, TZ = 'Europe/Zurich';
+const R_MAX = 30000, STEP_MIN = 5, MAX_AREA_M = 50000, GRID_PX = 900;
+const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
+
+// ------------------------------------------------------------ Gebiet
+let region = store.get('region') === 'world' ? 'world' : 'ch';
+const isCH = () => region === 'ch';
+// grobe Umgebung der Schweiz (swisstopo-Daten vorhanden); ausserhalb -> Weltweit nötig
+const inCH = (lat, lon) => lat > 45.8 && lat < 47.85 && lon > 5.9 && lon < 10.55;
+/** Projektion für einen Ort: Schweiz LV95, sonst lokale Transversale Mercator um den Ort */
+const projFor = (lat, lon) => (isCH() ? LV95 : localTM(+lat.toFixed(4), +lon.toFixed(4)));
 const lodName = lod => {
+  if (!isCH()) return `${lod[0].res} m Copernicus`;
   const g = lod.find(l => l.ground) ?? lod[0];
   const base = g.src === 'alti3d' ? '2 m' : g.src === 'regio' ? '10 m' : `${g.res} m`;
   return lod.some(l => l.src === 'surface') ? `${base} + Wald` : base;
 };
-const surfaceOn = () => $('surface').checked;
-/** Gelände-Schema für einen Ausschnitt mit Pixelgrösse px (Wald/Gebäude nur beim feinen Gelände) */
-const areaLod = px => { const l = lodForPixelSize(px); return surfaceOn() ? withSurface(l) : l; };
+const surfaceOn = () => isCH() && $('surface').checked;
+/** Gelände-Schema für einen Ausschnitt mit Pixelgrösse px (Wald/Gebäude nur Schweiz und feines Gelände) */
+const areaLod = px => {
+  if (!isCH()) return lodWorldForPixelSize(px);
+  const l = lodForPixelSize(px); return surfaceOn() ? withSurface(l) : l;
+};
+
+// Zeitzone: Schweiz fix, weltweit aus der Lage (Ausschnitt-Mitte bzw. Punkt)
+let TZ = 'Europe/Zurich';
+const setTZ = (lat, lon) => { TZ = isCH() ? 'Europe/Zurich' : (tzlookup(lat, lon) || 'UTC'); };
 const fmtTime = u => new Date(u * 1000).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 const status = t => { $('status').textContent = t; };
-const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
 
 // ------------------------------------------------------------ Karte
 const start = store.get('view') ?? { lat: 46.9682, lon: 9.0062, z: 15 };
@@ -27,9 +46,32 @@ const map = L.map('map', { zoomControl: false, attributionControl: true }).setVi
 L.control.zoom({ position: 'topright' }).addTo(map);
 const wmts = (layer, fmt, opts = {}) => L.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${fmt}`,
   { maxZoom: 19, maxNativeZoom: 18, attribution: '© <a href="https://www.swisstopo.admin.ch">swisstopo</a>', ...opts });
-wmts('ch.swisstopo.pixelkarte-farbe', 'jpeg').addTo(map);
-wmts('ch.swisstopo.swisstlm3d-wanderwege', 'png', { opacity: 0.9, attribution: '', minZoom: 13 }).addTo(map);
+const layersCH = [wmts('ch.swisstopo.pixelkarte-farbe', 'jpeg'), wmts('ch.swisstopo.swisstlm3d-wanderwege', 'png', { opacity: 0.9, attribution: '', minZoom: 13 })];
+const layersWorld = [L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  subdomains: 'abc', maxZoom: 19, maxNativeZoom: 17,
+  attribution: 'Karte © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) · Daten © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende, SRTM',
+})];
 map.on('moveend', () => { const c = map.getCenter(); store.set('view', { lat: c.lat, lon: c.lng, z: map.getZoom() }); updateAreaButton(); });
+
+function applyRegion() {
+  for (const l of [...layersCH, ...layersWorld]) map.removeLayer(l);
+  (isCH() ? layersCH : layersWorld).forEach(l => l.addTo(map));
+  $('reg-ch').setAttribute('aria-checked', String(isCH())); $('reg-world').setAttribute('aria-checked', String(!isCH()));
+  $('surface-row').hidden = !isCH(); $('world-note').hidden = isCH();
+  $('credits').innerHTML = isCH()
+    ? 'Karte und Höhendaten © swisstopo · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a>'
+    : 'Höhen: Copernicus DEM GLO-30 © DLR/Airbus, ESA · Karte © OpenTopoMap, OpenStreetMap · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a>';
+  updateAreaButton();
+}
+function setRegion(r) {
+  if (r === region) return;
+  region = r; store.set('region', r);
+  // Ausschnitt und Punkt gehören zum alten Gebiet
+  if (overlay) { map.removeLayer(overlay); overlay = null; renderer = null; }
+  area = null; $('timebox').hidden = true; $('legend').hidden = true; $('area-status').textContent = '';
+  applyRegion();
+  if (pointTerrain) showPoint(pointTerrain.lat, pointTerrain.lon);
+}
 
 // Leaflet-Ebene, die ein <canvas> statt eines Bildes zeigt (wie L.ImageOverlay)
 const CanvasOverlay = L.ImageOverlay.extend({
@@ -45,11 +87,16 @@ const CanvasOverlay = L.ImageOverlay.extend({
 // ------------------------------------------------------------ Datum / Zeiten
 function todayStr() { return new Date().toLocaleDateString('sv-SE', { timeZone: TZ }); }
 $('date').value = store.get('date') && store.get('dateSet') === todayStr() ? store.get('date') : todayStr();
-/** Unix-Sekunden von 00:00 Zürcher Zeit am gewählten Datum */
+/** Versatz der Zeitzone TZ zu UTC [s] zum Zeitpunkt unix */
+function tzOffset(unix) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    .formatToParts(new Date(unix * 1000)).map(x => [x.type, x.value]));
+  return (Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) / 1000) - unix;
+}
+/** Unix-Sekunden von 00:00 Ortszeit (TZ) am gewählten Datum */
 function dayStart(day) {
-  const noon = Date.parse(`${day}T12:00:00Z`) / 1000;
-  const h = +new Date(noon * 1000).toLocaleString('en-US', { timeZone: TZ, hour12: false, hour: '2-digit' });
-  return noon - 12 * 3600 - (h - 12) * 3600;
+  const midUtc = Date.parse(`${day}T00:00:00Z`) / 1000;
+  return midUtc - tzOffset(midUtc + 12 * 3600);
 }
 
 // ------------------------------------------------------------ Daten
@@ -59,27 +106,34 @@ const pyramid = () => (pyramidP ??= Pyramid.open('./data/pyramid'));
 // ------------------------------------------------------------ Punkt
 let marker = null, pointTerrain = null;
 async function showPoint(lat, lon) {
-  const { E, N } = wgs84ToLv95(lat, lon);
+  if (isCH() && !inCH(lat, lon)) { status('Ausserhalb der Schweiz: oben auf „Weltweit“ umschalten.'); return; }
+  setTZ(lat, lon);
+  const proj = projFor(lat, lon);
+  const { E, N } = proj.fromLatLon(lat, lon);
   marker ??= L.circleMarker([lat, lon], { radius: 8, color: '#fff', weight: 2, fillColor: '#d4442e', fillOpacity: 1 }).addTo(map);
   marker.setLatLng([lat, lon]);
   $('hint').hidden = true; $('point').hidden = false;
-  $('where').textContent = `${Math.round(E)} / ${Math.round(N)} – rechne…`;
+  $('where').textContent = 'rechne…';
   $('summary').textContent = ''; $('ivs').textContent = ''; $('chart').innerHTML = '';
   expand();
   try {
     let terrain = area?.terrain;
     // Gelände des Ausschnitts nur wiederverwenden, wenn es das feine 2-m-Modell ohne Oberfläche ist
     // (mit Wald lädt der Punkt die Oberfläche zusätzlich in 1 m)
-    const inArea = terrain && !surfaceOn() && area.lod === LOD_DEFAULT && E > area.grid.bboxLv95[0] && E < area.grid.bboxLv95[2] && N > area.grid.bboxLv95[1] && N < area.grid.bboxLv95[3];
+    const inArea = terrain && isCH() && !surfaceOn() && area.lod === LOD_DEFAULT && E > area.grid.bboxLv95[0] && E < area.grid.bboxLv95[2] && N > area.grid.bboxLv95[1] && N < area.grid.bboxLv95[3];
     if (!inArea) {
       status('Lade Höhendaten für den Punkt…');
-      const lod = surfaceOn() ? withSurface(LOD_DEFAULT, { point: true }) : LOD_DEFAULT;
-      terrain = await loadTerrainLod([E - 50, N - 50, E + 50, N + 50], await pyramid(), { rMax: R_MAX, lod });
+      if (isCH()) {
+        const lod = surfaceOn() ? withSurface(LOD_DEFAULT, { point: true }) : LOD_DEFAULT;
+        terrain = await loadTerrainLod([E - 50, N - 50, E + 50, N + 50], await pyramid(), { rMax: R_MAX, lod });
+      } else {
+        terrain = await loadTerrainWorld([E - 50, N - 50, E + 50, N + 50], proj, { rMax: R_MAX });
+      }
     }
     const az = Array.from({ length: 1440 }, (_, i) => i * 0.25);
     const h = pointHorizon(terrain, E, N, az, { eye: 1.7, rMax: R_MAX });
     const z = terrain.ground.sample(E, N), top = terrain.fine.sample(E, N);
-    pointTerrain = { E, N, lat, lon, az, h, z, canopy: terrain.groundLevel > 0 ? top - z : null };
+    pointTerrain = { E, N, lat, lon, proj, az, h, z, canopy: terrain.groundLevel > 0 ? top - z : null };
     renderPoint();
     status('');
   } catch (e) { console.error(e); status('Fehler: ' + e.message); }
@@ -87,23 +141,26 @@ async function showPoint(lat, lon) {
 
 function renderPoint() {
   if (!pointTerrain) return;
-  const { E, N, az, h, z } = pointTerrain, day = $('date').value, t0 = dayStart(day);
+  const { E, N, lat, lon, proj, az, h, z } = pointTerrain, day = $('date').value;
+  setTZ(lat, lon);
+  const t0 = dayStart(day);
   const times = Array.from({ length: 1440 }, (_, i) => t0 + 60 * i);
-  const lit = litTimeline(az, h, times, E, N);
+  const lit = litTimeline(az, h, times, E, N, proj);
   const mins = lit.filter(Boolean).length;
-  $('where').textContent = `${Math.round(E)} / ${Math.round(N)}, ${Math.round(z)} m ü. M.`;
+  $('where').textContent = isCH() ? `${Math.round(E)} / ${Math.round(N)}, ${Math.round(z)} m ü. M.`
+    : `${lat.toFixed(5)}, ${lon.toFixed(5)}, ${Math.round(z)} m ü. M. · Zeiten in ${TZ}`;
   $('summary').textContent = mins ? `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, '0')} min Sonne` : 'Keine direkte Sonne';
   $('ivs').innerHTML = intervals(times, lit).map(([a, b]) => `☀︎ ${fmtTime(a)} – ${fmtTime(b)}`).join('<br>');
   const cp = pointTerrain.canopy;
-  $('canopy').textContent = cp == null ? 'ohne Wald und Gebäude'
+  $('canopy').textContent = !isCH() ? 'Copernicus 30 m (Oberflächenmodell, Wald grob enthalten)' : cp == null ? 'ohne Wald und Gebäude'
     : cp > 3 ? `mit Wald und Gebäude · der Punkt liegt unter Bäumen oder an einem Gebäude (Oberfläche ${Math.round(cp)} m über Boden)`
       : 'mit Wald und Gebäude';
-  drawChart(az, h, times, E, N, lit);
+  drawChart(az, h, times, E, N, lit, proj);
 }
 
-function drawChart(az, h, times, E, N, lit) {
+function drawChart(az, h, times, E, N, lit, proj) {
   const W = 640, H = 240, L0 = 34, B = 24, T = 8, R = 8;
-  const suns = times.map(u => sunPositionLv95(u, E, N));
+  const suns = times.map(u => sunPositionGrid(u, E, N, proj));
   const vis = az.map((a, i) => (a >= 45 && a <= 315 ? h[i] : 0));
   const maxEl = Math.ceil((Math.max(30, ...suns.map(s => s.el), ...vis) + 3) / 10) * 10;
   const x = a => L0 + (a - 45) / 270 * (W - L0 - R), y = e => H - B - Math.max(0, e) / maxEl * (H - B - T);
@@ -131,8 +188,17 @@ function viewBounds() {
   const b = map.getBounds();
   return { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
 }
+const minPx = () => (isCH() ? 3 : 10); // weltweit: Daten 30 m, feinere Pixel bringen nichts
+function viewProj() { const c = map.getCenter(); return projFor(c.lat, c.lng); }
 function updateAreaButton() {
-  const b = viewBounds(), s = gridSizeFor(b, 3, GRID_PX);
+  if (!$('area')) return;
+  const c = map.getCenter();
+  if (isCH() && !inCH(c.lat, c.lng)) {
+    $('area').disabled = true; $('area').textContent = 'Ausserhalb der Schweiz';
+    $('region-info').textContent = '→ „Weltweit“ wählen'; return;
+  }
+  $('region-info').textContent = isCH() ? 'swisstopo, bis 2 m' : 'Copernicus 30 m';
+  const b = viewBounds(), s = gridSizeFor(b, minPx(), GRID_PX, viewProj());
   const big = Math.max(s.widthM, s.heightM) > MAX_AREA_M;
   const px = Math.max(s.widthM / s.w, s.heightM / s.h);
   $('area').disabled = big;
@@ -141,21 +207,24 @@ function updateAreaButton() {
 }
 
 async function computeArea() {
-  const b = viewBounds(), { w, h } = gridSizeFor(b, 3, GRID_PX);
-  const grid = mercatorGrid(b, w, h);
+  const b = viewBounds(), proj = viewProj(), { w, h } = gridSizeFor(b, minPx(), GRID_PX, proj);
+  const grid = mercatorGrid(b, w, h, proj);
   const lod = areaLod(grid.pixelSize);
+  const c = map.getCenter(); setTZ(c.lat, c.lng);
   $('area').disabled = true;
   try {
     $('area-status').textContent = 'Lade Höhendaten…';
-    const terrain = await loadTerrainLod(grid.bboxLv95, await pyramid(), {
-      rMax: R_MAX, lod, onProgress: (n, tot) => { $('area-status').textContent = `Lade 2-m-Kacheln ${n}/${tot}…`; },
-    });
+    const terrain = isCH()
+      ? await loadTerrainLod(grid.bboxLv95, await pyramid(), {
+        rMax: R_MAX, lod, onProgress: (n, tot) => { $('area-status').textContent = `Lade 2-m-Kacheln ${n}/${tot}…`; },
+      })
+      : await loadTerrainWorld(grid.bboxLv95, proj, { rMax: R_MAX, lod });
     $('area-status').textContent = 'Bereite Grafikkarte vor…';
     const canvas = overlay?._image ?? document.createElement('canvas');
     renderer ??= new ShadowRenderer(canvas);
     renderer.setTerrain(terrain, grid.center);
     renderer.setGrid(grid);
-    area = { grid, terrain, lod };
+    area = { grid, terrain, lod, proj, tz: TZ };
     hours = null;
     if (overlay) overlay.setBounds([[b.south, b.west], [b.north, b.east]]);
     else overlay = new CanvasOverlay(canvas, [[b.south, b.west], [b.north, b.east]], { opacity: 1, interactive: false }).addTo(map);
@@ -169,10 +238,11 @@ async function computeArea() {
 
 function prepareDay() {
   if (!area) return;
+  TZ = area.tz;
   const t0 = dayStart($('date').value), { E, N } = area.grid.center;
   suns = [];
   for (let m = 0; m < 1440; m += STEP_MIN) {
-    const u = t0 + 60 * m, s = sunPositionLv95Grad(u, E, N);
+    const u = t0 + 60 * m, s = sunPositionGridGrad(u, E, N, area.proj);
     if (s.el > -1.5) suns.push({ u, ...s });
   }
   $('timebox').hidden = false;
@@ -204,6 +274,7 @@ function draw() {
     }
     const s = suns[+$('time').value];
     if (!s) return;
+    TZ = area.tz;
     renderer.renderShadow(s.az, s.el, { rMax: R_MAX, grad: s.grad });
     selectedMinute = (s.u - dayStart($('date').value)) / 60;
     $('timelbl').textContent = fmtTime(s.u);
@@ -238,6 +309,8 @@ $('area').onclick = computeArea;
 $('time').oninput = () => { if ($('mode').value !== 'shadow') $('mode').value = 'shadow'; draw(); };
 $('mode').onchange = draw;
 $('surface').checked = store.get('surface') ?? true;
+$('reg-ch').onclick = () => setRegion('ch');
+$('reg-world').onclick = () => setRegion('world');
 $('surface').onchange = () => {
   store.set('surface', surfaceOn());
   updateAreaButton();
@@ -263,6 +336,6 @@ $('locate').onclick = () => {
 function expand() { $('sheet').classList.remove('collapsed'); }
 $('grip').onclick = () => $('sheet').classList.toggle('collapsed');
 
-updateAreaButton();
+applyRegion();
 // Für Tests: Zustand von aussen lesbar
-window.__app = { map, get area() { return area; }, get suns() { return suns; }, showPoint, computeArea };
+window.__app = { map, get area() { return area; }, get suns() { return suns; }, get point() { return pointTerrain; }, showPoint, computeArea, setRegion };

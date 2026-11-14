@@ -30,3 +30,6 @@ button:disabled { opacity:.5; }
 .check { display:flex; align-items:center; gap:8px; margin:0 0 8px; }
 .check input { width:20px; height:20px; accent-color:var(--ac); margin:0; }
 #canopy { margin-top:2px; }
+.seg { display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; flex:none; }
+.seg button { border:0; border-radius:0; padding:7px 10px; background:#fff; }
+.seg button[aria-checked="true"] { background:var(--fg); color:#fff; }

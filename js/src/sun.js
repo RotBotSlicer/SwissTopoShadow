@@ -1,6 +1,6 @@
 // Sonnenstand nach NOAA (Meeus-Näherung) – 1:1-Port von schatten/sun.py.
 // Azimut: Grad ab Norden im Uhrzeigersinn. Höhe: Grad, scheinbar (inkl. Refraktion).
-import { lv95ToWgs84, gridBearingOfNorth } from './coords.js';
+import { LV95, gridBearingOfNorth } from './coords.js';
 
 const DEG = Math.PI / 180;
 
@@ -48,18 +48,19 @@ export function sunPosition(unixS, latDeg, lonDeg, apparent = true) {
 
 function mod(a, n) { return ((a % n) + n) % n; }
 
-/** Sonnenstand im LV95-Gitter: Azimut ab Gitter-Nord (inkl. Meridiankonvergenz), Höhe. */
-export function sunPositionLv95(unixS, E, N, apparent = true) {
-  const { lat, lon } = lv95ToWgs84(E, N);
+/** Sonnenstand im Metergitter der Projektion proj: Azimut ab Gitter-Nord (inkl. Meridiankonvergenz), Höhe. */
+export function sunPositionGrid(unixS, E, N, proj = LV95, apparent = true) {
+  const { lat, lon } = proj.toLatLon(E, N);
   const p = sunPosition(unixS, lat, lon, apparent);
-  return { az: mod(p.az + gridBearingOfNorth(E, N), 360), el: p.el };
+  return { az: mod(p.az + gridBearingOfNorth(E, N, 0.001, proj), 360), el: p.el };
 }
+export const sunPositionLv95 = (unixS, E, N, apparent = true) => sunPositionGrid(unixS, E, N, LV95, apparent);
 
 /** Sonnenstand am Ort (E, N) plus lineare Änderung pro Meter (für grosse Ausschnitte), d = Schrittweite [m]. */
-export function sunPositionLv95Grad(unixS, E, N, d = 2000) {
-  const c = sunPositionLv95(unixS, E, N);
-  const e1 = sunPositionLv95(unixS, E + d, N), e0 = sunPositionLv95(unixS, E - d, N);
-  const n1 = sunPositionLv95(unixS, E, N + d), n0 = sunPositionLv95(unixS, E, N - d);
+export function sunPositionGridGrad(unixS, E, N, proj = LV95, d = 2000) {
+  const at = (e, n) => sunPositionGrid(unixS, e, n, proj);
+  const c = at(E, N), e1 = at(E + d, N), e0 = at(E - d, N), n1 = at(E, N + d), n0 = at(E, N - d);
   const da = (a, b) => ((a - b + 540) % 360) - 180;
   return { ...c, grad: { azE: da(e1.az, e0.az) / (2 * d), azN: da(n1.az, n0.az) / (2 * d), elE: (e1.el - e0.el) / (2 * d), elN: (n1.el - n0.el) / (2 * d) } };
 }
+export const sunPositionLv95Grad = (unixS, E, N, d = 2000) => sunPositionGridGrad(unixS, E, N, LV95, d);

@@ -27,3 +27,6 @@ button:disabled { opacity:.5; }
 .foot { margin-top:8px; }
 .leaflet-container { font:inherit; }
 .leaflet-top.leaflet-left { top:env(safe-area-inset-top); }
+.check { display:flex; align-items:center; gap:8px; margin:0 0 8px; }
+.check input { width:20px; height:20px; accent-color:var(--ac); margin:0; }
+#canopy { margin-top:2px; }

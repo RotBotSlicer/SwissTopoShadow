@@ -9,7 +9,8 @@ Ist die Rechenbasis der Web-App.
 - `raster.js` – `Raster` (bilinear, Randverhalten wie scipy), `Terrain` (Level of Detail mit Rückfall).
 - `tiles.js` – Kachelpyramide des Grobmodells lesen (`Pyramid`, `decodeTile`; gzip via `DecompressionStream`).
 - `loaders.js` – swissALTI3D 2 m (STAC + GeoTIFF), swissALTIRegio 10 m (COG per HTTP-Range), `loadTerrainLod`,
-  Level-Schemata `LOD_DEFAULT` / `LOD_10M` / `LOD_40M` und `lodForPixelSize`.
+  Level-Schemata `LOD_DEFAULT` / `LOD_10M` / `LOD_40M`, `lodForPixelSize`, `withSurface` und `loadSurface`
+  (swissSURFACE3D, Übersichtsstufe 1 m/2 m per HTTP-Range). `Terrain` hat ein Boden-Level für die Standorthöhe.
 - `horizon.js` – `pointHorizon`, `horizonMap`, `litDirect`, `litFromHorizon`, `litTimeline`, `intervals`, `sunHoursMap`.
 - `gpu.js` – `ShadowRenderer` (WebGL2): Schatten je Sonnenstand und Sonnenstunden, gleiches Verfahren wie `litDirect`.
   Im Browser-Test (`tools/test_gpu.py`) 100 % gleiche Pixel wie die CPU, synthetisch und mit echten Daten.

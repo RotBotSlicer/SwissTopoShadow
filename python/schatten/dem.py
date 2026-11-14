@@ -13,7 +13,9 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.ndimage import map_coordinates
 
-STAC = "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d/items"
+STAC_BASE = "https://data.geo.admin.ch/api/stac/v0.9/collections"
+STAC = f"{STAC_BASE}/ch.swisstopo.swissalti3d/items"
+STAC_SURFACE = f"{STAC_BASE}/ch.swisstopo.swisssurface3d-raster/items"  # Oberfläche inkl. Wald/Gebäude, 0.5 m
 NODATA_Z = -1.0e4  # Ersatzwert: liegt so tief, dass er nie Schatten wirft
 
 
@@ -68,8 +70,11 @@ class Raster:
 
 
 # ---------------------------------------------------------------- Download
-def find_tiles(bounds_lv95, res: float = 2.0):
-    """Neueste swissALTI3D-Kachel (GeoTIFF) je km² im Rechteck -> {tile_id: url}."""
+def find_tiles(bounds_lv95, res: float = 2.0, stac: str = STAC):
+    """Neueste Kachel (GeoTIFF, Auflösung res) je km² im Rechteck -> {tile_id: url}.
+
+    Standard swissALTI3D; mit stac=STAC_SURFACE, res=0.5 swissSURFACE3D-Raster.
+    """
     xmin, ymin, xmax, ymax = bounds_lv95
     m = 1500  # Rand, damit Randkacheln trotz Projektion sicher erfasst werden
     from pyproj import Transformer
@@ -77,7 +82,7 @@ def find_tiles(bounds_lv95, res: float = 2.0):
     tr = Transformer.from_crs(2056, 4326, always_xy=True)
     lons, lats = tr.transform([xmin - m, xmax + m, xmin - m, xmax + m],
                               [ymin - m, ymin - m, ymax + m, ymax + m])
-    url = f"{STAC}?bbox={min(lons)},{min(lats)},{max(lons)},{max(lats)}&limit=100"
+    url = f"{stac}?bbox={min(lons)},{min(lats)},{max(lons)},{max(lats)}&limit=100"
     tag = f"_{res:g}_2056_5728.tif"
     best = {}
     while url:
@@ -131,8 +136,43 @@ def mosaic(paths, bounds_lv95, res: float) -> Raster:
     return Raster(z, tr.c, tr.f, res)
 
 
+def read_surface(bounds_lv95, overview_level: int = 1) -> Raster:
+    """swissSURFACE3D-Raster (Gelände + Wald + Gebäude) als Mosaik ganzer km-Kacheln.
+
+    Gelesen wird nur eine Übersichtsstufe des COG (0 = 1 m, 1 = 2 m; per HTTP-Range),
+    nicht die ganze 0.5-m-Kachel (15 MB). Die Übersichten sind gemittelt.
+    """
+    import rasterio
+
+    os.environ.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
+    urls = find_tiles(bounds_lv95, 0.5, STAC_SURFACE)
+    ids = {k: tuple(int(v) for v in k.split("-")) for k in urls}
+    ex0, ex1 = min(i[0] for i in ids.values()), max(i[0] for i in ids.values())
+    nx0, nx1 = min(i[1] for i in ids.values()), max(i[1] for i in ids.values())
+    res = 0.5 * 2 ** (overview_level + 1)
+    P = int(1000 / res)
+    z = np.full(((nx1 - nx0 + 1) * P, (ex1 - ex0 + 1) * P), np.nan, np.float32)
+
+    def get(item):
+        k, u = item
+        with rasterio.open("/vsicurl/" + u, overview_level=overview_level) as s:
+            a = s.read(1).astype(np.float32)
+            a[(a == s.nodata) | (a < -1000) | (a > 1e30)] = np.nan
+        e, n = ids[k]
+        r0, c0 = (nx1 - n) * P, (e - ex0) * P
+        z[r0:r0 + P, c0:c0 + P] = a[:P, :P]
+
+    with cf.ThreadPoolExecutor(8) as ex:
+        list(ex.map(get, urls.items()))
+    return Raster(z, ex0 * 1000.0, (nx1 + 1) * 1000.0, res)
+
+
 class Terrain:
     """Gelände in mehreren Auflösungsstufen (Level of Detail nach Distanz).
+
+    ground_level: Index des Levels, aus dem die Höhe des Standorts selbst kommt
+    (Standard 0). Mit Oberflächenmodell (Wald/Gebäude) als Level 0 ist das der Boden
+    (swissALTI3D, Level 1): man steht unter den Bäumen, die Strahlen treffen die Kronen.
 
     levels: Liste von (Raster, r_bis) aufsteigend nach r_bis. Für eine Abtastung
     in Distanz r wird das erste Level mit r < r_bis verwendet; wo dieses keine
@@ -140,8 +180,9 @@ class Terrain:
     auch die Höhe des Standorts selbst.
     """
 
-    def __init__(self, levels):
+    def __init__(self, levels, ground_level: int = 0):
         self.levels = [(ras, float(r)) for ras, r in levels]
+        self.ground_level = ground_level
 
     @classmethod
     def two(cls, fine, coarse, r_split=1000.0):
@@ -150,6 +191,11 @@ class Terrain:
     @property
     def fine(self):
         return self.levels[0][0]
+
+    @property
+    def ground(self):
+        """Raster für die Standorthöhe (Boden)."""
+        return self.levels[self.ground_level][0]
 
     def level_index(self, r):
         for i, (_, rb) in enumerate(self.levels):
@@ -223,10 +269,13 @@ def read_regio(bounds_lv95, cog_url: str = REGIO_COG) -> Raster:
     return Raster(z, X0 + c0 * res, Y0 - r0 * res, res)
 
 
-def load_terrain_lod(bounds_area, cache_dir, pyramid, r_max=30000.0, lod=LOD_DEFAULT) -> Terrain:
+def load_terrain_lod(bounds_area, cache_dir, pyramid, r_max=30000.0, lod=LOD_DEFAULT,
+                     surface: bool = False) -> Terrain:
     """Gelände wie in der App: 2 m (swissALTI3D) -> 10 m (swissALTIRegio) -> Pyramide.
 
     pyramid: schatten.pyramid.Pyramid (lokal oder per URL).
+    surface: zusätzlich swissSURFACE3D (2 m, Wald/Gebäude) als Level 0 im Nahbereich;
+             Standorthöhe dann vom Boden (swissALTI3D).
     """
     xmin, ymin, xmax, ymax = bounds_area
     grow = lambda m: (xmin - m, ymin - m, xmax + m, ymax + m)
@@ -236,4 +285,6 @@ def load_terrain_lod(bounds_area, cache_dir, pyramid, r_max=30000.0, lod=LOD_DEF
     levels = [(fine, lod["fine_until"]), (regio, lod["regio_until"])]
     for res, until in lod["pyramid"]:
         levels.append((pyramid.raster(res, grow(min(until, r_max) + res)), until))
+    if surface:
+        return Terrain([(read_surface(bf), lod["fine_until"])] + levels, ground_level=1)
     return Terrain(levels)

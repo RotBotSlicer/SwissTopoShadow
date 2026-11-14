@@ -51,7 +51,7 @@ def _rays(terrain, r_max, growth):
 def point_horizon(terrain, E, N, az_deg, eye=1.7, r_max=15000.0, growth=0.0):
     """Horizontwinkel [°] eines einzelnen Punkts für die Azimute az_deg."""
     az = np.radians(np.asarray(az_deg, dtype=float))
-    z0 = float(terrain.fine.sample(np.array([E]), np.array([N]))[0]) + eye
+    z0 = float(terrain.ground.sample(np.array([E]), np.array([N]))[0]) + eye
     best = np.full(az.shape, -np.inf)
     sa, ca = np.sin(az), np.cos(az)
     for r in _rays(terrain, r_max, growth):
@@ -68,7 +68,7 @@ def horizon_map(terrain, E, N, n_az=72, eye=1.0, r_max=15000.0, growth=0.01, pro
     """
     E = np.asarray(E, dtype=float)
     N = np.asarray(N, dtype=float)
-    z0 = terrain.fine.sample(E, N) + eye
+    z0 = terrain.ground.sample(E, N) + eye
     rs = _rays(terrain, r_max, growth)
     drops = _drop(rs)
     out = np.empty((n_az,) + E.shape, dtype=np.float32)
@@ -91,7 +91,7 @@ def lit_direct(terrain, E, N, sun_el, sun_az, eye=1.0, r_max=15000.0, growth=0.0
     N = np.asarray(N, dtype=float)
     if sun_el <= -1.0:
         return np.zeros(E.shape, bool)
-    z0 = terrain.fine.sample(E, N) + eye
+    z0 = terrain.ground.sample(E, N) + eye
     a = np.radians(sun_az)
     t = np.tan(np.radians(sun_el))
     lit = np.ones(E.shape, bool)

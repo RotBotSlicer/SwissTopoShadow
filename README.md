@@ -5,6 +5,9 @@ Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhen
 - **Ort antippen:** Sonnenzeiten am Punkt, Diagramm Horizont gegen Sonnenbahn.
 - **Schatten für Ausschnitt:** Schatten über der Landeskarte mit Zeitschieber und Animation,
   oder Sonnenstunden des Tages als Farbkarte. Gerechnet auf der Grafikkarte (WebGL2).
+- **Wald und Gebäude (Schalter):** swissSURFACE3D im Nahbereich bis 1 km (Ausschnitt 2 m, Punkt 1 m bis 300 m).
+  Der Standort bleibt am Boden (swissALTI3D + Augenhöhe), die Strahlen treffen Kronen und Dächer.
+  Nur bei feinem Gelände (Ausschnitt bis ca. 3 km).
 
 **Web-App:** https://rotbotslicer.github.io/SwissTopoShadow/
 
@@ -36,6 +39,13 @@ der Shader rechnet ihn je Pixel linear nach (40 km: 99.9–100 % gleich wie exak
     cd js && npm install && npm test
     python tools/test_gpu.py [--real]       # WebGL-Schatten vs. CPU-Referenz in Headless-Chrome (100 % gleiche Pixel)
     tools/build_site.sh && python tools/e2e_app.py   # ganze App im Browser
+
+## Wald und Gebäude: Hinweise
+- Bäume erscheinen so, wie sie bei der Befliegung waren (am Testort 2017). Laubbäume werfen auch im Winter vollen Schatten.
+- Die Übersichtsstufen (1 m / 2 m) sind gemittelt; direkt neben Bäumen oder Häusern (ein, zwei Meter) zählt der
+  Standort schon als „darunter“. Die App zeigt das beim Punkt an.
+- Referenz Bösbächibach 14.11.2026: ohne Wald 10:08–10:56, mit Wald 10:14–10:16 und 10:20–10:50 (Strauch/Baum am Punkt, 5 m).
+  Im 1×1-km-Testgebiet liegen mit Wald um 12:30 nur noch 14 % statt 28 % der Fläche in der Sonne.
 
 ## Koordinaten
 Gerechnet wird im LV95-Gitter. Der Sonnenazimut wird um die Meridiankonvergenz gedreht

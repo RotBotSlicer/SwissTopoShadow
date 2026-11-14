@@ -75,3 +75,19 @@ def test_sun_window_boesbaechi_lod(terrain_lod):
     end = pd.Timestamp(iv[0][1], unit="s", tz="UTC").tz_convert("Europe/Zurich")
     assert abs((start - pd.Timestamp("2026-11-14 10:08", tz="Europe/Zurich")).total_seconds()) < 180
     assert abs((end - pd.Timestamp("2026-11-14 10:56", tz="Europe/Zurich")).total_seconds()) < 180
+
+
+def test_sun_window_boesbaechi_with_surface(terrain_lod):
+    """Mit Wald/Gebäude (swissSURFACE3D 1 m bis 300 m, 2 m bis 1 km): Strauch/Baum am Punkt kürzt die Sonne."""
+    from schatten.dem import Terrain, read_surface
+
+    s1 = read_surface((E - 350, N - 350, E + 350, N + 350), overview_level=0)
+    s2 = read_surface((E - 1050, N - 1050, E + 1050, N + 1050), overview_level=1)
+    t = Terrain([(s1, 300), (s2, 1000)] + terrain_lod.levels, ground_level=2)
+    az = np.arange(0, 360, 0.25)
+    h = point_horizon(t, E, N, az, eye=1.7, r_max=30000)
+    tt = pd.date_range("2026-11-14 06:00", "2026-11-14 18:00", freq="1min", tz="Europe/Zurich")
+    u = to_unix(tt)
+    lit, *_ = lit_timeline(az, h, u, E, N)
+    fmt = lambda x: pd.Timestamp(x, unit="s", tz="UTC").tz_convert("Europe/Zurich").strftime("%H:%M")
+    assert [f"{fmt(a)}–{fmt(b)}" for a, b in intervals(u, lit)] == ["10:14–10:16", "10:20–10:50"]

@@ -6,6 +6,8 @@ Dient als geprüfte Referenz für die spätere Web-App (JS/WebGL-Portierung).
 ## Module
 - `schatten/sun.py` – Sonnenstand (NOAA-Algorithmus, nur numpy). Abweichung zu pvlib/SPA < 0.01° Höhe, < 0.02° Azimut (Sonne > 5°).
 - `schatten/dem.py` – swissALTI3D-Kacheln über STAC suchen, cachen, mosaikieren; `Raster` (bilineare Abtastung), `Terrain` (fein im Nahbereich < r_split, grob für den Fernhorizont).
+- `dem.read_surface` – swissSURFACE3D-Raster (Wald/Gebäude) aus den Übersichtsstufen; `load_terrain_lod(..., surface=True)`,
+  `Terrain(..., ground_level=…)`: Standorthöhe vom Boden, Strahlen gegen die Oberfläche.
 - `schatten/pyramid.py` – Grobmodell der ganzen Schweiz (+ Grenzgebiete) als Kachelpyramide 40/80/160 m aus swissALTIRegio, eigenes einfaches Kachelformat (in JS ohne Bibliothek lesbar).
 - `schatten/horizon.py` – Horizont eines Punkts, Horizontkarte für ein Gitter, Schatten direkt bzw. aus Horizontkarte, Sonnenzeiten, Sonnenstundenkarte. Erdkrümmung + terrestrische Refraktion (k = 0.13) berücksichtigt.
 

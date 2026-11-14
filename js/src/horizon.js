@@ -18,7 +18,7 @@ export function rayDistances(terrain, rMax, growth = 0) {
 
 /** Horizontwinkel [°] eines Punkts für die Azimute azDeg (Array). */
 export function pointHorizon(terrain, E, N, azDeg, { eye = 1.7, rMax = 15000, growth = 0 } = {}) {
-  const z0 = terrain.fine.sample(E, N) + eye;
+  const z0 = terrain.ground.sample(E, N) + eye;
   const rs = rayDistances(terrain, rMax, growth);
   return Float64Array.from(azDeg, a => {
     const s = Math.sin(a * DEG), c = Math.cos(a * DEG);
@@ -41,7 +41,7 @@ export function gridCoords(grid, i) {
 export function horizonMap(terrain, grid, { nAz = 72, eye = 1.0, rMax = 15000, growth = 0.01, onProgress } = {}) {
   const n = grid.w * grid.h;
   const E = new Float64Array(n), N = new Float64Array(n), z0 = new Float64Array(n);
-  for (let i = 0; i < n; i++) { [E[i], N[i]] = gridCoords(grid, i); z0[i] = terrain.fine.sample(E[i], N[i]) + eye; }
+  for (let i = 0; i < n; i++) { [E[i], N[i]] = gridCoords(grid, i); z0[i] = terrain.ground.sample(E[i], N[i]) + eye; }
   const rs = rayDistances(terrain, rMax, growth);
   const out = new Float32Array(nAz * n);
   const best = new Float64Array(n);
@@ -83,7 +83,7 @@ export function litDirect(terrain, grid, sunEl, sunAz, { eye = 1.0, rMax = 15000
   const t = Math.tan(sunEl * DEG), s = Math.sin(sunAz * DEG), c = Math.cos(sunAz * DEG);
   const rs = rayDistances(terrain, rMax, growth);
   for (let i = 0; i < n; i++) {
-    const [E, N] = gridCoords(grid, i), z0 = terrain.fine.sample(E, N) + eye;
+    const [E, N] = gridCoords(grid, i), z0 = terrain.ground.sample(E, N) + eye;
     let lit = 1;
     for (const r of rs) if ((terrain.sample(E + s * r, N + c * r, r) - z0 - drop(r)) / r >= t) { lit = 0; break; }
     out[i] = lit;

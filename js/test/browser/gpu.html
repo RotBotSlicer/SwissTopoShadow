@@ -8,7 +8,7 @@ import { Raster, Terrain } from '../../src/raster.js';
 import { litDirect } from '../../src/horizon.js';
 import { ShadowRenderer } from '../../src/gpu.js';
 import { Pyramid } from '../../src/tiles.js';
-import { loadTerrainLod, LOD_DEFAULT, LOD_10M, LOD_40M } from '../../src/loaders.js';
+import { loadTerrainLod, LOD_DEFAULT, LOD_10M, LOD_40M, withSurface } from '../../src/loaders.js';
 import { sunPositionLv95, sunPositionLv95Grad } from '../../src/sun.js';
 
 const results = [];
@@ -125,7 +125,26 @@ async function bigArea() {
   }
 }
 
-try { await synthetic(); if (location.hash === '#real') { await real(); await bigArea(); await lodCompare(); } log('FERTIG'); }
+// Mit Wald/Gebäude: GPU vs. CPU, und wie viel Fläche zusätzlich im Schatten liegt
+async function surfaceReal() {
+  const E = 2719286, N = 1203098, half = 500, px = 4;
+  const pyr = await Pyramid.open('../../../data/pyramid');
+  const area = [E - half, N - half, E + half, N + half];
+  const tS = await loadTerrainLod(area, pyr, { rMax: 30000, lod: withSurface(LOD_DEFAULT) });
+  const t0 = await loadTerrainLod(area, pyr, { rMax: 30000 });
+  const grid = { x0: E - half, y0: N + half, res: px, w: 2 * half / px, h: 2 * half / px };
+  const gS = new ShadowRenderer(document.createElement('canvas')); gS.setTerrain(tS, { E, N }); gS.setGrid(grid);
+  const g0 = new ShadowRenderer(document.createElement('canvas')); g0.setTerrain(t0, { E, N }); g0.setGrid(grid);
+  const frac = m => m.reduce((a, b) => a + b, 0) / m.length;
+  for (const hhmm of ['10:30', '12:30', '14:30']) {
+    const u = Date.parse(`2026-11-14T${hhmm}:00+01:00`) / 1000, { az, el } = sunPositionLv95(u, E, N);
+    const a = gS.litMask(az, el, { rMax: 30000 }), c = litDirect(tS, grid, el, az, { rMax: 30000 });
+    log({ test: 'oberfläche', hhmm, agree: agree(a, c), besonnt_mit: +frac(a).toFixed(3), besonnt_ohne: +frac(g0.litMask(az, el, { rMax: 30000 })).toFixed(3) });
+  }
+}
+
+try { await synthetic(); if (location.hash === '#real') { await real(); await surfaceReal(); await bigArea(); await lodCompare(); }
+  if (location.hash === '#surface') await surfaceReal(); log('FERTIG'); }
 catch (e) { log({ error: String(e.stack || e) }); log('FERTIG'); }
 window.__results = results;
 </script></body></html>

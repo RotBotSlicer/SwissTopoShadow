@@ -21,10 +21,18 @@ export class Raster {
   }
 }
 
-/** Gelände aus Levels [{raster, until}] aufsteigend nach Distanz; Rückfall auf gröbere Levels ohne Daten. */
+/**
+ * Gelände aus Levels [{raster, until}] aufsteigend nach Distanz; Rückfall auf gröbere Levels ohne Daten.
+ * groundLevel: Level für die Standorthöhe (Boden). Mit Oberflächenmodell (Wald/Gebäude) vorne ist das
+ * swissALTI3D: man steht unter den Bäumen, die Strahlen treffen die Kronen.
+ */
 export class Terrain {
-  constructor(levels) { this.levels = levels.map(l => ({ raster: l.raster, until: l.until ?? Infinity })); }
+  constructor(levels, { groundLevel = 0 } = {}) {
+    this.levels = levels.map(l => ({ raster: l.raster, until: l.until ?? Infinity }));
+    this.groundLevel = groundLevel;
+  }
   get fine() { return this.levels[0].raster; }
+  get ground() { return this.levels[this.groundLevel].raster; }
   levelIndex(r) {
     for (let i = 0; i < this.levels.length; i++) if (r < this.levels[i].until) return i;
     return this.levels.length - 1;

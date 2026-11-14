@@ -1,6 +1,6 @@
 """Führt js/test/browser/gpu.html in Headless-Chrome aus (Vergleich GPU vs. CPU).
 
-python tools/test_gpu.py [--real]     (--real: mit echten swisstopo-Daten, braucht Netz)
+python tools/test_gpu.py [--real | --surface]   (mit echten swisstopo-Daten, braucht Netz)
 """
 import functools, http.server, json, os, sys, threading
 from playwright.sync_api import sync_playwright
@@ -8,7 +8,7 @@ from playwright.sync_api import sync_playwright
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(http.server.SimpleHTTPRequestHandler, directory=root))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
-url = f"http://127.0.0.1:{srv.server_port}/js/test/browser/gpu.html" + ("#real" if "--real" in sys.argv else "")
+url = f"http://127.0.0.1:{srv.server_port}/js/test/browser/gpu.html" + ("#real" if "--real" in sys.argv else "#surface" if "--surface" in sys.argv else "")
 with sync_playwright() as p:
     kw = dict(headless=True, args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
     if os.path.exists("/usr/bin/google-chrome"):

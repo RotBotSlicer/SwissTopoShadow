@@ -5,21 +5,24 @@
 import { R_EARTH, K_REFRACTION, gridCoords } from './horizon.js';
 import { NODATA_Z } from './raster.js';
 
-const MAX_LEVELS = 5;
+const MAX_LEVELS = 7;
+// Textureinheiten: 0..6 Levels, 7 Koordinaten, 8 Summe (Anzeige), 9 Zwischenspeicher
+const U_COORD = 7, U_ACC = 8, U_FBO = 9;
 
 const VS = `#version 300 es
 in vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 
 const FS = `#version 300 es
 precision highp float; precision highp int; precision highp sampler2D;
-uniform sampler2D uL0, uL1, uL2, uL3, uL4, uCoord, uAcc;
+uniform sampler2D uL0, uL1, uL2, uL3, uL4, uL5, uL6, uCoord, uAcc;
 uniform vec2 uOrig[${MAX_LEVELS}];
 uniform float uRes[${MAX_LEVELS}];
 uniform float uUntil[${MAX_LEVELS}];
 uniform ivec2 uSize[${MAX_LEVELS}];
-uniform int uNL, uMode;
-uniform float uAz, uEl;          // Sonne am Bezugspunkt [rad], Azimut im LV95-Gitter
-uniform vec2 uAzG, uElG;          // Änderung je Meter (E, N) – für grosse Ausschnitte
+uniform int uNL, uMode, uGround;
+uniform vec2 uDir0;               // Sonnenrichtung am Bezugspunkt (sin az, cos az), Azimut im LV95-Gitter
+uniform float uTan0, uEl0;        // tan(Sonnenhöhe), Sonnenhöhe [rad] am Bezugspunkt
+uniform vec2 uAzG, uElG;          // Änderung je Meter (E, N) [rad/m] – für grosse Ausschnitte
 uniform float uEye, uRMax, uGrowth, uAccScale;
 uniform vec4 uShadow;
 out vec4 o;
@@ -31,7 +34,9 @@ float fetchL(int i, ivec2 ij) {
   if (i == 1) return texelFetch(uL1, ij, 0).r;
   if (i == 2) return texelFetch(uL2, ij, 0).r;
   if (i == 3) return texelFetch(uL3, ij, 0).r;
-  return texelFetch(uL4, ij, 0).r;
+  if (i == 4) return texelFetch(uL4, ij, 0).r;
+  if (i == 5) return texelFetch(uL5, ij, 0).r;
+  return texelFetch(uL6, ij, 0).r;
 }
 // bilinear zwischen Pixelzentren, ausserhalb NOD (wie Raster.sample)
 float sampleL(int i, vec2 p) {
@@ -69,10 +74,12 @@ void main() {
     return;
   }
   vec2 p = texelFetch(uCoord, px, 0).xy;
-  float az = uAz + dot(uAzG, p), el = uEl + dot(uElG, p);
-  vec2 uDir = vec2(sin(az), cos(az));
-  float uTanEl = tan(el);
-  float z0 = sampleL(0, p) + uEye;
+  // Sonne am Pixel: Bezugswert (auf der CPU in double gerechnet) plus lineare Korrektur
+  float da = dot(uAzG, p), de = dot(uElG, p);
+  vec2 uDir = uDir0 + da * vec2(uDir0.y, -uDir0.x);
+  float uTanEl = uTan0 + de * (1.0 + uTan0 * uTan0);
+  float el = uEl0 + de;
+  float z0 = sampleL(uGround, p) + uEye; // Standort: Boden-Level
   bool lit = el > -0.0175; // Sonne unter ca. -1°: Nacht
   float r = uRes[0];
   for (int k = 0; k < 8192 && lit; k++) {
@@ -107,9 +114,10 @@ export class ShadowRenderer {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, 'aPos'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     this.u = new Proxy({}, { get: (c, k) => (c[k] ??= gl.getUniformLocation(prog, k)) });
-    ['uL0', 'uL1', 'uL2', 'uL3', 'uL4', 'uCoord', 'uAcc'].forEach((n, i) => gl.uniform1i(this.u[n], i));
+    for (let i = 0; i < MAX_LEVELS; i++) gl.uniform1i(this.u[`uL${i}`], i);
+    gl.uniform1i(this.u.uCoord, U_COORD); gl.uniform1i(this.u.uAcc, U_ACC);
     this.textures = [];
-    this.dummy = this._tex(6, 1, 1, gl.RGBA8, gl.UNSIGNED_BYTE, new Uint8Array(4)); // Platzhalter für uAcc
+    this.dummy = this._tex(U_ACC, 1, 1, gl.RGBA8, gl.UNSIGNED_BYTE, new Uint8Array(4)); // Platzhalter für uAcc
   }
 
   _tex(unit, w, h, fmt, type, data) {
@@ -142,6 +150,7 @@ export class ShadowRenderer {
     gl.uniform2fv(this.u['uOrig[0]'], orig); gl.uniform1fv(this.u['uRes[0]'], res);
     gl.uniform1fv(this.u['uUntil[0]'], until); gl.uniform2iv(this.u['uSize[0]'], size);
     gl.uniform1i(this.u.uNL, terrain.levels.length);
+    gl.uniform1i(this.u.uGround, terrain.groundLevel ?? 0);
   }
 
   /** grid: {w, h, coords:Float64Array(2wh) LV95 je Pixel, Zeile 0 = oben}  oder {x0,y0,res,w,h} (LV95-Gitter) */
@@ -154,13 +163,13 @@ export class ShadowRenderer {
       c[2 * j] = E - this.ref.E; c[2 * j + 1] = N - this.ref.N;
     }
     if (this.coordTex) gl.deleteTexture(this.coordTex);
-    this.coordTex = this._tex(5, w, h, gl.RG32F, gl.FLOAT, c);
+    this.coordTex = this._tex(U_COORD, w, h, gl.RG32F, gl.FLOAT, c);
     this.w = w; this.h = h;
     this.canvas.width = w; this.canvas.height = h;
     // Zwischenspeicher (RGBA8) für Maske und Summe
     if (this.fboTex) { gl.deleteTexture(this.fboTex); gl.deleteFramebuffer(this.fbo); }
-    this.fboTex = this._tex(7, w, h, gl.RGBA8, gl.UNSIGNED_BYTE, null);
-    gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, null); // nicht an Sampler gebunden (keine Rückkopplung)
+    this.fboTex = this._tex(U_FBO, w, h, gl.RGBA8, gl.UNSIGNED_BYTE, null);
+    gl.activeTexture(gl.TEXTURE0 + U_FBO); gl.bindTexture(gl.TEXTURE_2D, null); // nicht an Sampler gebunden (keine Rückkopplung)
     this.fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.fboTex, 0);
@@ -170,7 +179,8 @@ export class ShadowRenderer {
   /** grad: {azE, azN, elE, elN} in Grad pro Meter (Sonnenstand variiert über grosse Ausschnitte), Standard 0. */
   _sun(sunAz, sunEl, { eye = 1.0, rMax = 30000, growth = 0.01, grad = null } = {}) {
     const gl = this.gl, D = Math.PI / 180, g = grad ?? { azE: 0, azN: 0, elE: 0, elN: 0 };
-    gl.uniform1f(this.u.uAz, sunAz * D); gl.uniform1f(this.u.uEl, sunEl * D);
+    gl.uniform2f(this.u.uDir0, Math.sin(sunAz * D), Math.cos(sunAz * D));
+    gl.uniform1f(this.u.uTan0, Math.tan(Math.max(sunEl, -80) * D)); gl.uniform1f(this.u.uEl0, sunEl * D);
     gl.uniform2f(this.u.uAzG, g.azE * D, g.azN * D); gl.uniform2f(this.u.uElG, g.elE * D, g.elN * D);
     gl.uniform1f(this.u.uEye, eye); gl.uniform1f(this.u.uRMax, rMax); gl.uniform1f(this.u.uGrowth, growth);
   }
@@ -234,7 +244,7 @@ export class ShadowRenderer {
   /** Zuletzt gerechnete Sonnenstunden farbig anzeigen (Skala 0..maxHours). */
   showSunHours(stepMin, maxHours) {
     const gl = this.gl;
-    gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, this.fboTex);
+    gl.activeTexture(gl.TEXTURE0 + U_ACC); gl.bindTexture(gl.TEXTURE_2D, this.fboTex);
     gl.uniform1f(this.u.uAccScale, stepMin / 60 / Math.max(maxHours, 1e-6));
     gl.disable(gl.BLEND);
     this._draw(3, false);

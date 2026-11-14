@@ -1,6 +1,6 @@
 // Web-App: Karte (swisstopo), Ort antippen -> Sonnenzeiten; Ausschnitt -> Schatten über den Tag (WebGL).
 import { Pyramid } from './lib/tiles.js';
-import { loadTerrainLod, lodForPixelSize, LOD_DEFAULT } from './lib/loaders.js';
+import { loadTerrainLod, lodForPixelSize, withSurface, LOD_DEFAULT } from './lib/loaders.js';
 import { pointHorizon, litTimeline, intervals } from './lib/horizon.js';
 import { sunPositionLv95, sunPositionLv95Grad } from './lib/sun.js';
 import { lv95ToWgs84, wgs84ToLv95 } from './lib/coords.js';
@@ -9,7 +9,14 @@ import { ShadowRenderer } from './lib/gpu.js';
 
 const $ = id => document.getElementById(id);
 const R_MAX = 30000, STEP_MIN = 5, MAX_AREA_M = 50000, GRID_PX = 900, TZ = 'Europe/Zurich';
-const lodName = lod => (lod[0].src === 'alti3d' ? '2 m' : lod[0].src === 'regio' ? '10 m' : `${lod[0].res} m`);
+const lodName = lod => {
+  const g = lod.find(l => l.ground) ?? lod[0];
+  const base = g.src === 'alti3d' ? '2 m' : g.src === 'regio' ? '10 m' : `${g.res} m`;
+  return lod.some(l => l.src === 'surface') ? `${base} + Wald` : base;
+};
+const surfaceOn = () => $('surface').checked;
+/** Gelände-Schema für einen Ausschnitt mit Pixelgrösse px (Wald/Gebäude nur beim feinen Gelände) */
+const areaLod = px => { const l = lodForPixelSize(px); return surfaceOn() ? withSurface(l) : l; };
 const fmtTime = u => new Date(u * 1000).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 const status = t => { $('status').textContent = t; };
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
@@ -61,15 +68,18 @@ async function showPoint(lat, lon) {
   expand();
   try {
     let terrain = area?.terrain;
-    // Gelände des Ausschnitts nur wiederverwenden, wenn es das feine 2-m-Modell enthält
-    const inArea = terrain && area.lod === LOD_DEFAULT && E > area.grid.bboxLv95[0] && E < area.grid.bboxLv95[2] && N > area.grid.bboxLv95[1] && N < area.grid.bboxLv95[3];
+    // Gelände des Ausschnitts nur wiederverwenden, wenn es das feine 2-m-Modell ohne Oberfläche ist
+    // (mit Wald lädt der Punkt die Oberfläche zusätzlich in 1 m)
+    const inArea = terrain && !surfaceOn() && area.lod === LOD_DEFAULT && E > area.grid.bboxLv95[0] && E < area.grid.bboxLv95[2] && N > area.grid.bboxLv95[1] && N < area.grid.bboxLv95[3];
     if (!inArea) {
       status('Lade Höhendaten für den Punkt…');
-      terrain = await loadTerrainLod([E - 50, N - 50, E + 50, N + 50], await pyramid(), { rMax: R_MAX });
+      const lod = surfaceOn() ? withSurface(LOD_DEFAULT, { point: true }) : LOD_DEFAULT;
+      terrain = await loadTerrainLod([E - 50, N - 50, E + 50, N + 50], await pyramid(), { rMax: R_MAX, lod });
     }
     const az = Array.from({ length: 1440 }, (_, i) => i * 0.25);
     const h = pointHorizon(terrain, E, N, az, { eye: 1.7, rMax: R_MAX });
-    pointTerrain = { E, N, az, h, z: terrain.fine.sample(E, N) };
+    const z = terrain.ground.sample(E, N), top = terrain.fine.sample(E, N);
+    pointTerrain = { E, N, lat, lon, az, h, z, canopy: terrain.groundLevel > 0 ? top - z : null };
     renderPoint();
     status('');
   } catch (e) { console.error(e); status('Fehler: ' + e.message); }
@@ -84,6 +94,10 @@ function renderPoint() {
   $('where').textContent = `${Math.round(E)} / ${Math.round(N)}, ${Math.round(z)} m ü. M.`;
   $('summary').textContent = mins ? `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, '0')} min Sonne` : 'Keine direkte Sonne';
   $('ivs').innerHTML = intervals(times, lit).map(([a, b]) => `☀︎ ${fmtTime(a)} – ${fmtTime(b)}`).join('<br>');
+  const cp = pointTerrain.canopy;
+  $('canopy').textContent = cp == null ? 'ohne Wald und Gebäude'
+    : cp > 3 ? `mit Wald und Gebäude · der Punkt liegt unter Bäumen oder an einem Gebäude (Oberfläche ${Math.round(cp)} m über Boden)`
+      : 'mit Wald und Gebäude';
   drawChart(az, h, times, E, N, lit);
 }
 
@@ -123,13 +137,13 @@ function updateAreaButton() {
   const px = Math.max(s.widthM / s.w, s.heightM / s.h);
   $('area').disabled = big;
   $('area').textContent = big ? 'Für Schatten näher zoomen'
-    : `Schatten berechnen (${lodName(lodForPixelSize(px))})`;
+    : `Schatten berechnen (${lodName(areaLod(px))})`;
 }
 
 async function computeArea() {
   const b = viewBounds(), { w, h } = gridSizeFor(b, 3, GRID_PX);
   const grid = mercatorGrid(b, w, h);
-  const lod = lodForPixelSize(grid.pixelSize);
+  const lod = areaLod(grid.pixelSize);
   $('area').disabled = true;
   try {
     $('area-status').textContent = 'Lade Höhendaten…';
@@ -223,6 +237,13 @@ function play() {
 $('area').onclick = computeArea;
 $('time').oninput = () => { if ($('mode').value !== 'shadow') $('mode').value = 'shadow'; draw(); };
 $('mode').onchange = draw;
+$('surface').checked = store.get('surface') ?? true;
+$('surface').onchange = () => {
+  store.set('surface', surfaceOn());
+  updateAreaButton();
+  if (area) computeArea();
+  if (pointTerrain) showPoint(pointTerrain.lat, pointTerrain.lon); // gleiche Koordinaten, kein Umrechnungsfehler
+};
 $('play').onclick = () => {
   playing = !playing; $('play').textContent = playing ? '❚❚' : '▶';
   if (playing) { $('mode').value = 'shadow'; play(); }

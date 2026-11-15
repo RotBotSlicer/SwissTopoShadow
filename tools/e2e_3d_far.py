@@ -6,7 +6,7 @@ srv=http.server.ThreadingHTTPServer(("127.0.0.1",0),functools.partial(http.serve
 threading.Thread(target=srv.serve_forever,daemon=True).start()
 with sync_playwright() as p:
     b=p.chromium.launch(executable_path="/usr/bin/google-chrome",headless=True,args=["--use-angle=swiftshader","--enable-unsafe-swiftshader","--ignore-gpu-blocklist"],proxy={"server":os.environ["HTTPS_PROXY"],"bypass":"127.0.0.1"})
-    pg=b.new_page(viewport={"width":420,"height":800},device_scale_factor=1); errs=[]
+    pg=b.new_page(viewport={"width":420,"height":800},device_scale_factor=1, locale="de-CH"); errs=[]
     pg.on("pageerror",lambda e: errs.append(str(e)))
     pg.on("console",lambda m: m.type=="error" and errs.append(m.text))
     u=f"http://127.0.0.1:{srv.server_port}/"

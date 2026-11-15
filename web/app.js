@@ -13,10 +13,12 @@ import { ShadowRenderer } from './lib/gpu.js';
 import { tzlookup } from 'tz-lookup';
 import { MapView } from './mapview.js';
 import { heightsCH, heightsWorld, encodeTerrarium } from './lib/demtiles.js';
+import { t, setLang, applyStatic, LANG, LOCALE } from './i18n.js';
+applyStatic();
 
 const $ = id => document.getElementById(id);
 // Fehler sichtbar machen (z. B. auf dem Handy ohne Entwicklerwerkzeuge)
-const showError = e => { const el = document.getElementById('status'); if (el) el.textContent = `Fehler: ${e?.message ?? e}`; };
+const showError = e => { const el = document.getElementById('status'); if (el) el.textContent = t('error', { m: e?.message ?? e }); };
 window.addEventListener('error', ev => showError(ev.error ?? ev.message));
 window.addEventListener('unhandledrejection', ev => showError(ev.reason));
 const VERSION = (document.querySelector('meta[name="app-version"]')?.content ?? '').slice(0, 7);
@@ -34,7 +36,7 @@ const lodName = lod => {
   if (!isCH()) return `${lod[0].res} m`;
   const g = lod.find(l => l.ground) ?? lod[0];
   const base = g.src === 'alti3d' ? '2 m' : g.src === 'regio' ? '10 m' : `${g.res} m`;
-  return lod.some(l => l.src === 'surface') ? `${base} + Wald` : base;
+  return lod.some(l => l.src === 'surface') ? `${base} + ${t('forest')}` : base;
 };
 const surfaceOn = () => isCH() && $('surface').checked;
 /** Gelände-Schema für einen Ausschnitt mit Pixelgrösse px (Wald/Gebäude nur Schweiz und feines Gelände) */
@@ -46,7 +48,7 @@ const areaLod = px => {
 // Zeitzone: Schweiz fix, weltweit aus der Lage (Ausschnitt-Mitte bzw. Punkt)
 let TZ = 'Europe/Zurich';
 const setTZ = (lat, lon) => { TZ = isCH() ? 'Europe/Zurich' : (tzlookup(lat, lon) || 'UTC'); };
-const fmtTime = u => new Date(u * 1000).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+const fmtTime = u => new Date(u * 1000).toLocaleTimeString(LOCALE(), { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 const status = t => { $('status').textContent = t; };
 
 // ------------------------------------------------------------ Karte
@@ -70,8 +72,8 @@ function applyRegion() {
   $('reg-ch').setAttribute('aria-checked', String(isCH())); $('reg-world').setAttribute('aria-checked', String(!isCH()));
   $('surface-row').hidden = !isCH(); $('world-note').hidden = isCH();
   $('credits').innerHTML = isCH()
-    ? `Karte und Höhendaten © swisstopo · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`
-    : `Höhen: Copernicus DEM GLO-30 © DLR/Airbus, ESA · Karte © OpenTopoMap, OpenStreetMap · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`;
+    ? `${t('creditsCH')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`
+    : `${t('creditsWorld')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`;
   updateAreaButton();
 }
 function setRegion(r) {
@@ -106,13 +108,13 @@ const pyramid = () => (pyramidP ??= Pyramid.open('./data/pyramid'));
 // ------------------------------------------------------------ Punkt
 let pointTerrain = null;
 async function showPoint(lat, lon) {
-  if (isCH() && !inCH(lat, lon)) { status('Ausserhalb der Schweiz: oben auf „Weltweit“ umschalten.'); return; }
+  if (isCH() && !inCH(lat, lon)) { status(t('outsideCH')); return; }
   setTZ(lat, lon);
   const proj = projFor(lat, lon);
   const { E, N } = proj.fromLatLon(lat, lon);
   mv.setMarker(lat, lon);
   $('hint').hidden = true; $('point').hidden = false;
-  $('where').textContent = 'rechne…';
+  $('where').textContent = t('computing');
   $('summary').textContent = ''; $('ivs').textContent = ''; $('chart').innerHTML = '';
   expand();
   try {
@@ -121,7 +123,7 @@ async function showPoint(lat, lon) {
     // (mit Wald lädt der Punkt die Oberfläche zusätzlich in 1 m)
     const inArea = terrain && isCH() && !surfaceOn() && area.lod === LOD_DEFAULT && E > area.grid.bboxLv95[0] && E < area.grid.bboxLv95[2] && N > area.grid.bboxLv95[1] && N < area.grid.bboxLv95[3];
     if (!inArea) {
-      status('Lade Höhendaten für den Punkt…');
+      status(t('loadingPoint'));
       if (isCH()) {
         const lod = surfaceOn() ? withSurface(LOD_DEFAULT, { point: true }) : LOD_DEFAULT;
         terrain = await loadTerrainLod([E - 50, N - 50, E + 50, N + 50], await pyramid(), { rMax: R_MAX, lod });
@@ -156,14 +158,13 @@ function renderPoint() {
   const times = Array.from({ length: 1440 }, (_, i) => t0 + 60 * i);
   const lit = litTimeline(az, h, times, E, N, proj);
   const mins = lit.filter(Boolean).length;
-  $('where').textContent = isCH() ? `${Math.round(E)} / ${Math.round(N)}, ${Math.round(z)} m ü. M.`
-    : `${lat.toFixed(5)}, ${lon.toFixed(5)}, ${Math.round(z)} m ü. M. · Zeiten in ${TZ}`;
-  $('summary').textContent = mins ? `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, '0')} min Sonne` : 'Keine direkte Sonne';
+  $('where').textContent = isCH() ? `${Math.round(E)} / ${Math.round(N)}, ${Math.round(z)} ${t('masl')}`
+    : `${lat.toFixed(5)}, ${lon.toFixed(5)}, ${Math.round(z)} ${t('masl')} · ${t('timesIn', { tz: TZ })}`;
+  $('summary').textContent = mins ? t('sunHM', { h: Math.floor(mins / 60), m: String(mins % 60).padStart(2, '0') }) : t('noSun');
   $('ivs').innerHTML = intervals(times, lit).map(([a, b]) => `☀︎ ${fmtTime(a)} – ${fmtTime(b)}`).join('<br>');
   const cp = pointTerrain.canopy;
-  $('canopy').textContent = !isCH() ? 'Copernicus 30 m (Oberflächenmodell, Wald grob enthalten)' : cp == null ? 'ohne Wald und Gebäude'
-    : cp > 3 ? `mit Wald und Gebäude · der Punkt liegt unter Bäumen oder an einem Gebäude (Oberfläche ${Math.round(cp)} m über Boden)`
-      : 'mit Wald und Gebäude';
+  $('canopy').textContent = !isCH() ? t('copNote') : cp == null ? t('noSurface')
+    : cp > 3 ? t('underCanopy', { h: Math.round(cp) }) : t('withSurface');
   $('psum').textContent = `${$('summary').textContent} · ${intervals(times, lit).map(([a, b]) => `${fmtTime(a)}–${fmtTime(b)}`).join(', ') || '–'}`;
   drawChart(az, h, times, E, N, lit, proj, pointTerrain);
 }
@@ -226,11 +227,11 @@ function drawChart(az, h, times, E, N, lit, proj, pt = {}) {
   chartData = { rel, center, r0, r1, maxEl, hz, sLong, sShort, suns, lit, E, N, proj };
   chartView = null;
   renderChart();
-  const fd = day => new Date(`${day}T12:00:00Z`).toLocaleDateString('de-CH', { day: 'numeric', month: 'numeric', timeZone: 'UTC' });
+  const fd = day => new Date(`${day}T12:00:00Z`).toLocaleDateString(LOCALE(), { day: 'numeric', month: 'numeric', timeZone: 'UTC' });
   const has = k => hz.some(p => p[3] === k && p[0] >= r0 && p[0] <= r1);
-  $('lg-obj').innerHTML = '<span class="sw sw-ter"></span>Gelände'
-    + (has(1) ? '<span class="sw sw-tree"></span>Wald/Bäume' : '') + (has(2) ? '<span class="sw sw-bld"></span>Gebäude' : '');
-  $('lg-day').textContent = fd($('date').value); $('lg-sum').textContent = `längster Tag (${fd(ex.long)})`; $('lg-win').textContent = `kürzester Tag (${fd(ex.short)})`;
+  $('lg-obj').innerHTML = `<span class="sw sw-ter"></span>${t('terrain')}`
+    + (has(1) ? `<span class="sw sw-tree"></span>${t('trees')}` : '') + (has(2) ? `<span class="sw sw-bld"></span>${t('buildings')}` : '');
+  $('lg-day').textContent = fd($('date').value); $('lg-sum').textContent = t('longestOn', { d: fd(ex.long) }); $('lg-win').textContent = t('shortestOn', { d: fd(ex.short) });
   updateProfileVisibility();
 }
 
@@ -279,7 +280,8 @@ function renderChart() {
     if (i % tStep === 0) ticks += `<text x="${x(r).toFixed(1)}" y="${(y(p.el) - 6).toFixed(1)}" font-size="11" text-anchor="middle" fill="#3d4a42">${tStep === 60 ? fmtTime(p.u).slice(0, 2) + 'h' : fmtTime(p.u)}</text>`;
   });
   // Achsen: Himmelsrichtungen, gezoomt zusätzlich Grad
-  const names = { 0: 'N', 45: 'NO', 90: 'O', 135: 'SO', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+  const names = LANG === 'de' ? { 0: 'N', 45: 'NO', 90: 'O', 135: 'SO', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' }
+    : { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
   const aStep = [45, 15, 10, 5, 2, 1].find(s => (a1 - a0) / s >= 4) ?? 1;
   for (let r = Math.ceil(a0 / aStep) * aStep; r <= a1; r += aStep) {
     const az = ((r + center) % 360 + 360) % 360;
@@ -386,16 +388,16 @@ function updateAreaButton() {
   if (!$('area')) return;
   const c = mv.center();
   if (isCH() && !inCH(c.lat, c.lon)) {
-    $('area').disabled = true; $('area').textContent = 'Ausserhalb der Schweiz';
-    $('region-info').textContent = '→ „Weltweit“ wählen'; return;
+    $('area').disabled = true; $('area').textContent = t('outsideBtn');
+    $('region-info').textContent = t('chooseWorld'); return;
   }
-  $('region-info').textContent = isCH() ? 'swisstopo, bis 2 m' : 'Copernicus 30 m';
+  $('region-info').textContent = isCH() ? t('infoCH') : t('infoWorld');
   const b = viewBounds(), s = gridSizeFor(b, minPx(), GRID_PX, viewProj());
   const big = Math.max(s.widthM, s.heightM) > MAX_AREA_M;
   const px = Math.max(s.widthM / s.w, s.heightM / s.h);
   $('area').disabled = big;
-  $('area').textContent = big ? 'Für Schatten näher zoomen'
-    : `Schatten · ${lodName(areaLod(px))}${wantFar(b) ? ' + Fernbereich' : ''}`;
+  $('area').textContent = big ? t('zoomCloser')
+    : t('shadowBtn', { lod: lodName(areaLod(px)) }) + (wantFar(b) ? t('farPart') : '');
 }
 /** Fernbereich nur, wenn die 3D-Ansicht deutlich mehr Boden zeigt als der feine Bereich. */
 function wantFar(near) {
@@ -418,7 +420,7 @@ async function loadLayer(id, b, proj, targetPx, lodOf, label) {
   const grid = mercatorGrid(b, w, h, proj), lod = lodOf(grid.pixelSize);
   const terrain = isCH()
     ? await loadTerrainLod(grid.bboxLv95, await pyramid(), {
-      rMax: R_MAX, lod, onProgress: (n, tot) => { $('area-status').textContent = `${label}: lade 2-m-Kacheln ${n}/${tot}…`; },
+      rMax: R_MAX, lod, onProgress: (n, tot) => { $('area-status').textContent = t('loadingTiles', { l: label, n, t: tot }); },
     })
     : await loadTerrainWorld(grid.bboxLv95, proj, { rMax: R_MAX, lod });
   const r = renderers[id] ??= new ShadowRenderer(document.createElement('canvas'));
@@ -433,12 +435,12 @@ async function computeArea() {
   const c = mv.center(); setTZ(c.lat, c.lon);
   $('area').disabled = true;
   try {
-    $('area-status').textContent = 'Lade Höhendaten…';
-    const near = await loadLayer('near', b, proj, minPx(), areaLod, 'Nah');
+    $('area-status').textContent = t('loadingDem');
+    const near = await loadLayer('near', b, proj, minPx(), areaLod, t('near'));
     const layers = [near];
     if (farB) {
-      $('area-status').textContent = 'Lade Höhendaten Fernbereich…';
-      const far = await loadLayer('far', farB, proj, FAR_MIN_PX, farLod, 'Fern');
+      $('area-status').textContent = t('loadingDemFar');
+      const far = await loadLayer('far', farB, proj, FAR_MIN_PX, farLod, t('far'));
       far.renderer.setHole(holeRect(farB, b, far.grid.w, far.grid.h));
       layers.unshift(far); // zuerst (unten) zeichnen
     }
@@ -448,8 +450,9 @@ async function computeArea() {
     for (const L of layers) await mv.setOverlay(L.id, L.renderer.canvas, L.b);
     prepareDay();
     const g = near.grid, fr = layers.length > 1 ? layers[0] : null;
-    $('area-status').textContent = `${g.w}×${g.h} Pixel à ${g.pixelSize.toFixed(1)} m · Gelände ${lodName(near.lod)}`
-      + (fr ? ` · Fernbereich ${(Math.max(fr.grid.w * fr.grid.pixelSize, fr.grid.h * fr.grid.pixelSize) / 1000).toFixed(0)} km à ${fr.grid.pixelSize.toFixed(0)} m` : '');
+    area.statusText = () => t('areaInfo', { w: g.w, h: g.h, px: g.pixelSize.toFixed(1), lod: lodName(near.lod) })
+      + (fr ? t('farInfo', { km: (Math.max(fr.grid.w * fr.grid.pixelSize, fr.grid.h * fr.grid.pixelSize) / 1000).toFixed(0), px: fr.grid.pixelSize.toFixed(0) }) : '');
+    $('area-status').textContent = area.statusText();
     $('sheet').classList.add('collapsed'); // Karte freigeben, Zeitschieber bleibt sichtbar
   } catch (e) {
     console.error(e); $('area-status').textContent = 'Fehler: ' + e.message;
@@ -492,7 +495,7 @@ function draw() {
     const mode = $('mode').value;
     $('legend').hidden = mode !== 'hours';
     if (mode === 'hours') {
-      $('timelbl').textContent = 'Tag';
+      $('timelbl').textContent = t('day');
       const mx = suns.length * STEP_MIN / 60;
       $('legend').innerHTML = `<span>0 h</span><span class="ramp" style="background:linear-gradient(90deg,#29337a,#338c8c,#f2d94d,#ed731a)"></span><span>${mx.toFixed(1)} h</span>`;
       if (hours === null) computeHours(mx);
@@ -523,7 +526,7 @@ function computeHours(mx) {
     }
     job.i += n;
     mv.overlayChanged();
-    $('area-status').textContent = job.i < suns.length ? `Sonnenstunden ${Math.round(100 * job.i / suns.length)} %` : `Sonnenstunden für ${$('date').value}`;
+    $('area-status').textContent = job.i < suns.length ? t('hoursPct', { p: Math.round(100 * job.i / suns.length) }) : t('hoursFor', { d: $('date').value });
     if (job.i < suns.length) requestAnimationFrame(step); else job.done = true;
   };
   requestAnimationFrame(step);
@@ -565,12 +568,12 @@ $('play').onclick = () => {
 $('date').onchange = () => { store.set('date', $('date').value); store.set('dateSet', todayStr()); prepareDay(); renderPoint(); };
 $('today').onclick = () => { $('date').value = todayStr(); $('date').onchange(); };
 $('locate').onclick = () => {
-  if (!navigator.geolocation) return status('Standort nicht verfügbar');
-  status('Suche Standort…');
+  if (!navigator.geolocation) return status(t('noGeo'));
+  status(t('locating'));
   navigator.geolocation.getCurrentPosition(p => {
     mv.setView(p.coords.latitude, p.coords.longitude, Math.max(mv.zoom(), 15));
     showPoint(p.coords.latitude, p.coords.longitude);
-  }, err => status('Standort: ' + err.message), { enableHighAccuracy: true, timeout: 15000 });
+  }, err => status(t('geoErr', { m: err.message })), { enableHighAccuracy: true, timeout: 15000 });
 };
 
 // Bottom-Sheet ein-/ausklappen
@@ -599,15 +602,15 @@ applyRegion();
     ctrl?.abort(); ctrl = new AbortController();
     const text = q.value;
     if (text.trim().length < 2) { results = []; render(); info.textContent = ''; return; }
-    info.textContent = 'Suche …';
+    info.textContent = t('searching');
     try {
       const c = mv.center();
-      results = await searchPlaces(text, { region, near: { lat: c.lat, lon: c.lon }, signal: ctrl.signal });
+      results = await searchPlaces(text, { region, lang: LANG, near: { lat: c.lat, lon: c.lon }, signal: ctrl.signal });
       if (text !== q.value) return;
       render();
-      info.textContent = results.length ? '' : 'Nichts gefunden';
+      info.textContent = results.length ? '' : t('notFound');
     } catch (e) {
-      if (e.name !== 'AbortError') { info.textContent = 'Suche nicht erreichbar'; console.error(e); }
+      if (e.name !== 'AbortError') { info.textContent = t('searchDown'); console.error(e); }
     }
   }
   function choose(r) {
@@ -624,5 +627,21 @@ applyRegion();
     if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); run().then(() => { if (results[0] && !box.hidden) choose(results[0]); }); }
   });
 }
+
+// ------------------------------------------------------------ Sprache
+function showLang() {
+  $('lang-de').setAttribute('aria-checked', String(LANG === 'de')); $('lang-en').setAttribute('aria-checked', String(LANG === 'en'));
+}
+function switchLang(l) {
+  if (l === LANG) return;
+  setLang(l); showLang();
+  applyRegion(); // Quellenangabe, Knopf Ausschnitt
+  if (pointTerrain) renderPoint(); else if (chartData) renderChart();
+  if (area?.statusText && !hours) $('area-status').textContent = area.statusText();
+  if (area) { hours = hours?.done ? hours : null; draw(); }
+}
+$('lang-de').onclick = () => switchLang('de');
+$('lang-en').onclick = () => switchLang('en');
+showLang();
 
 window.__app = { mv, setView: (lat, lon, z) => mv.setView(lat, lon, z), get area() { return area; }, get suns() { return suns; }, get point() { return pointTerrain; }, showPoint, computeArea, setRegion };

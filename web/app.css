@@ -68,3 +68,5 @@ body.has-profile #sbtn { top:calc(var(--ph, 0px) + 16px); }
 #sres .sn { font-weight:600; } #sres .sd { font-size:.8rem; color:var(--mut); }
 #sinfo:empty { display:none; } #sinfo { padding:4px 8px; }
 #preset { border:0; background:none; font-size:1.15rem; line-height:1; padding:0 6px; }
+.lang button { border:0; background:none; padding:0 3px; font-size:inherit; color:var(--mut); }
+.lang button[aria-checked="true"] { color:var(--fg); font-weight:700; text-decoration:underline; }

@@ -2,6 +2,7 @@
 
 Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhenmodellen von swisstopo.
 
+- **Sprache:** Deutsch/Englisch unten rechts (DE · EN), Voreinstellung nach Browsersprache.
 - **Suche (Lupe oben links):** Orte, Berge, Hütten und Adressen. Schweiz über die Suche von geo.admin.ch (swissNAMES3D),
   sonst weltweit über Photon (OpenStreetMap); ein Treffer ausserhalb der Schweiz schaltet auf „Weltweit“.
 - **Ort antippen:** Sonnenzeiten am Punkt. Profil oben über der Karte (Schalter „Profil“): Horizont, Sonnenbahn des

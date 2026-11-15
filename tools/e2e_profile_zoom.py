@@ -8,7 +8,7 @@ threading.Thread(target=srv.serve_forever, daemon=True).start()
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path="/usr/bin/google-chrome", headless=True, args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
                           proxy={"server": os.environ["HTTPS_PROXY"], "bypass": "127.0.0.1"})
-    ctx = b.new_context(viewport={"width": 420, "height": 800}, device_scale_factor=2, has_touch=True, is_mobile=True)
+    ctx = b.new_context(locale="de-CH", viewport={"width": 420, "height": 800}, device_scale_factor=2, has_touch=True, is_mobile=True)
     pg = ctx.new_page(); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     u = f"http://127.0.0.1:{srv.server_port}/"

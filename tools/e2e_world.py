@@ -13,7 +13,7 @@ with sync_playwright() as p:
     if os.environ.get("HTTPS_PROXY"):
         kw["proxy"] = {"server": os.environ["HTTPS_PROXY"], "bypass": "127.0.0.1,localhost"}
     b = p.chromium.launch(**kw)
-    pg = b.new_page(viewport={"width": 400, "height": 620}, device_scale_factor=2)
+    pg = b.new_page(viewport={"width": 400, "height": 620}, device_scale_factor=2, locale="de-CH")
     errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.on("console", lambda m: m.type == "error" and "tile.opentopomap" not in m.text and errs.append(m.text))

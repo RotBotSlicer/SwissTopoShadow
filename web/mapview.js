@@ -5,7 +5,7 @@
 
 const SWISSTOPO = l => `https://wmts.geo.admin.ch/1.0.0/${l}/default/current/3857/{z}/{x}/{y}.${l.includes('wanderwege') ? 'png' : 'jpeg'}`;
 const ATTR_CH = '© <a href="https://www.swisstopo.admin.ch">swisstopo</a>';
-const ATTR_OTM = 'Karte © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) · Daten © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende, SRTM';
+const ATTR_OTM = '© <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM';
 
 /** Terrarium-RGBA (256×256) -> PNG-Bytes für MapLibre. */
 async function toPng(rgba) {

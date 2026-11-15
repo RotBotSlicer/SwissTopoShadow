@@ -8,7 +8,7 @@ threading.Thread(target=srv.serve_forever,daemon=True).start()
 lat,lon=float(sys.argv[1]),float(sys.argv[2])
 with sync_playwright() as p:
     b=p.chromium.launch(executable_path="/usr/bin/google-chrome",headless=True,args=["--use-angle=swiftshader","--enable-unsafe-swiftshader"],proxy={"server":os.environ["HTTPS_PROXY"],"bypass":"127.0.0.1"})
-    pg=b.new_page(viewport={"width":420,"height":800},device_scale_factor=2); errs=[]
+    pg=b.new_page(viewport={"width":420,"height":800},device_scale_factor=2, locale="de-CH"); errs=[]
     pg.on("pageerror",lambda e: errs.append(str(e))); pg.on("console",lambda m: m.type=="error" and errs.append(m.text))
     u=f"http://127.0.0.1:{srv.server_port}/"
     pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear()"); pg.goto(u); pg.wait_for_timeout(1500)

@@ -18,17 +18,17 @@
 
 <!-- Profil (Horizont und Sonnenbahnen) oben über der Karte, unabhängig vom Menü -->
 <div id="profile" hidden>
-  <div class="phead"><span id="psum"></span><button id="preset" hidden aria-label="Ganzen Horizont zeigen">⟲</button><button id="pclose" aria-label="Profil ausblenden">×</button></div>
-  <svg id="chart" viewBox="0 0 640 230" aria-label="Horizont und Sonnenbahn"></svg>
-  <div class="plegend small"><span class="sw sw-day"></span><span id="lg-day">gewählter Tag</span>
-    <span class="sw sw-sum"></span><span id="lg-sum">längster Tag</span><span class="sw sw-win"></span><span id="lg-win">kürzester Tag</span><span id="lg-obj"></span></div>
+  <div class="phead"><span id="psum"></span><button id="preset" hidden aria-label="Ganzen Horizont zeigen" data-i18n-aria="resetZoom" data-i18n-title="resetZoom">⟲</button><button id="pclose" aria-label="Profil ausblenden" data-i18n-aria="closeProfile">×</button></div>
+  <svg id="chart" viewBox="0 0 640 230" aria-label="Horizont und Sonnenbahn" data-i18n-aria="chartLabel"></svg>
+  <div class="plegend small"><span class="sw sw-day"></span><span id="lg-day" data-i18n="chosenDay">gewählter Tag</span>
+    <span class="sw sw-sum"></span><span id="lg-sum" data-i18n="longestDay">längster Tag</span><span class="sw sw-win"></span><span id="lg-win" data-i18n="shortestDay">kürzester Tag</span><span id="lg-obj"></span></div>
 </div>
 
 <!-- Ortssuche -->
-<button id="sbtn" aria-label="Ort suchen"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+<button id="sbtn" aria-label="Ort suchen" data-i18n-aria="search"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
 <div id="search" hidden>
-  <div class="srow"><input id="sq" type="search" placeholder="Ort, Berg, Hütte, Adresse …" autocomplete="off" autocapitalize="off" enterkeyhint="search" aria-label="Ort suchen">
-    <button id="sclose" aria-label="Suche schliessen">×</button></div>
+  <div class="srow"><input id="sq" type="search" placeholder="Ort, Berg, Hütte, Adresse …" data-i18n-ph="searchPh" autocomplete="off" autocapitalize="off" enterkeyhint="search" aria-label="Ort suchen" data-i18n-aria="search">
+    <button id="sclose" aria-label="Suche schliessen" data-i18n-aria="closeSearch">×</button></div>
   <ul id="sres" role="listbox"></ul>
   <div id="sinfo" class="small mut"></div>
 </div>
@@ -37,38 +37,38 @@
   <div class="grip" id="grip"></div>
   <div id="timebox" hidden>
     <div class="bar">
-      <button id="play" aria-label="Abspielen">▶</button>
-      <input id="time" type="range" min="0" max="1" step="1" value="0" aria-label="Uhrzeit">
+      <button id="play" aria-label="Abspielen" data-i18n-aria="play">▶</button>
+      <input id="time" type="range" min="0" max="1" step="1" value="0" aria-label="Uhrzeit" data-i18n-aria="time">
       <span id="timelbl" class="tnum">--:--</span>
     </div>
   </div>
   <div class="bar">
-    <div class="seg" role="radiogroup" aria-label="Gebiet">
-      <button id="reg-ch" role="radio">Schweiz</button><button id="reg-world" role="radio">Weltweit</button>
+    <div class="seg" role="radiogroup" aria-label="Gebiet" data-i18n-aria="region">
+      <button id="reg-ch" role="radio" data-i18n="ch">Schweiz</button><button id="reg-world" role="radio" data-i18n="world">Weltweit</button>
     </div>
-    <div class="seg" id="base-seg" role="radiogroup" aria-label="Hintergrund">
-      <button id="base-map" role="radio">Karte</button><button id="base-air" role="radio">Luftbild</button>
+    <div class="seg" id="base-seg" role="radiogroup" aria-label="Hintergrund" data-i18n-aria="background">
+      <button id="base-map" role="radio" data-i18n="map">Karte</button><button id="base-air" role="radio" data-i18n="aerial">Luftbild</button>
     </div>
-    <button id="t3d" aria-pressed="false" title="3D-Ansicht">3D</button>
+    <button id="t3d" aria-pressed="false" title="3D-Ansicht" data-i18n-title="view3d">3D</button>
   </div>
   <div id="region-info" class="mut small"></div>
   <div class="bar">
-    <input id="date" type="date" aria-label="Datum">
-    <button id="today" title="Heute">Heute</button>
-    <button id="locate" title="Mein Standort" aria-label="Mein Standort">◎</button>
-    <button id="ptoggle" aria-pressed="true" title="Profil ein-/ausblenden">Profil</button>
+    <input id="date" type="date" aria-label="Datum" data-i18n-aria="date">
+    <button id="today" title="Heute" data-i18n="today" data-i18n-title="today">Heute</button>
+    <button id="locate" title="Mein Standort" aria-label="Mein Standort" data-i18n-title="myLocation" data-i18n-aria="myLocation">◎</button>
+    <button id="ptoggle" aria-pressed="true" title="Profil ein-/ausblenden" data-i18n-title="profileToggle" data-i18n="profile">Profil</button>
   </div>
 
   <div id="area-box">
     <div class="bar">
-      <button id="area" class="pri">Schatten für Ausschnitt</button>
-      <select id="mode" aria-label="Anzeige">
-        <option value="shadow">Schatten</option>
-        <option value="hours">Sonnenstunden</option>
+      <button id="area" class="pri" data-i18n="areaBtn">Schatten für Ausschnitt</button>
+      <select id="mode" aria-label="Anzeige" data-i18n-aria="display">
+        <option value="shadow" data-i18n="modeShadow">Schatten</option>
+        <option value="hours" data-i18n="modeHours">Sonnenstunden</option>
       </select>
     </div>
-    <label class="check" id="surface-row"><input type="checkbox" id="surface"> Wald und Gebäude <span class="mut small">(swissSURFACE3D, nur bei feinem Gelände)</span></label>
-    <div id="world-note" class="mut small" hidden>Weltweit: Copernicus-Höhenmodell 30 m (Oberfläche, Wald grob enthalten) · Karte OpenTopoMap</div>
+    <label class="check" id="surface-row"><input type="checkbox" id="surface"> <span data-i18n="surface">Wald und Gebäude</span> <span class="mut small" data-i18n="surfaceNote">(swissSURFACE3D, nur bei feinem Gelände)</span></label>
+    <div id="world-note" class="mut small" hidden data-i18n="worldNote">Weltweit: Copernicus-Höhenmodell 30 m (Oberfläche, Wald grob enthalten) · Karte OpenTopoMap</div>
     <div id="legend" hidden></div>
     <div id="area-status" class="mut small"></div>
   </div>
@@ -79,9 +79,9 @@
     <div id="ivs"></div>
     <div id="canopy" class="mut small"></div>
   </div>
-  <div id="hint" class="mut">Tippe auf die Karte, um die Sonnenzeiten an einem Ort zu sehen.</div>
+  <div id="hint" class="mut" data-i18n="hint">Tippe auf die Karte, um die Sonnenzeiten an einem Ort zu sehen.</div>
   <div id="status" class="mut small"></div>
-  <div class="foot small mut" id="credits"></div>
+  <div class="foot small mut"><span id="credits"></span> · <span class="lang" role="radiogroup" aria-label="Sprache" data-i18n-aria="language"><button id="lang-de" role="radio">DE</button><button id="lang-en" role="radio">EN</button></span></div>
 </div>
 
 <script type="module" src="./app.js"></script>

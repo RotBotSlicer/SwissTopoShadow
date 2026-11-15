@@ -21,7 +21,7 @@ def ph(route):
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path="/usr/bin/google-chrome", headless=True, args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
                           proxy={"server": os.environ["HTTPS_PROXY"], "bypass": "127.0.0.1"})
-    pg = b.new_page(viewport={"width": 420, "height": 800}); errs = []
+    pg = b.new_page(viewport={"width": 420, "height": 800}, locale="de-CH"); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.route("**/api3.geo.admin.ch/**", geo); pg.route("**/photon.komoot.io/**", ph)
     u = f"http://127.0.0.1:{srv.server_port}/"

@@ -16,7 +16,7 @@ with sync_playwright() as p:
     if os.environ.get("HTTPS_PROXY"):
         kw["proxy"] = {"server": os.environ["HTTPS_PROXY"], "bypass": "127.0.0.1,localhost"}
     b = p.chromium.launch(**kw)
-    ctx = b.new_context(viewport={"width": 400, "height": 860}, device_scale_factor=2)
+    ctx = b.new_context(locale="de-CH", viewport={"width": 400, "height": 860}, device_scale_factor=2)
     pg = ctx.new_page()
     errs = []
     pg.on("console", lambda m: m.type == "error" and errs.append(m.text))

@@ -24,6 +24,7 @@ test('Photon: Name, Ort/Land, Zoom nach Art, Schweiz erkannt', () => {
   const [m, b] = parsePhoton(PH);
   assert.equal(m.name, 'Matterhorn'); assert.equal(m.kind, 'Gipfel'); assert.equal(m.detail, 'Valais/Wallis, Schweiz'); assert.equal(m.zoom, 14); assert.equal(m.ch, true);
   assert.equal(b.zoom, 12); assert.equal(b.ch, false);
+  assert.equal(parsePhoton(PH, 'en')[0].kind, 'Peak');
 });
 
 test('Schweiz: ohne Treffer bei geo.admin.ch weiter mit Photon; Welt: Photon mit Nähe', async () => {

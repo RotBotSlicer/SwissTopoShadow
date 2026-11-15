@@ -29,15 +29,18 @@ const KIND_DE = { peak: 'Gipfel', volcano: 'Vulkan', mountain_range: 'Gebirge', 
   alpine_hut: 'Berghütte', wilderness_hut: 'Hütte', hotel: 'Hotel', attraction: 'Sehenswürdigkeit', viewpoint: 'Aussichtspunkt',
   castle: 'Burg', museum: 'Museum', church: 'Kirche', station: 'Bahnhof', aerodrome: 'Flugplatz', park: 'Park', house: 'Adresse' };
 
+const kindOf = (v, lang) => (!(v in KIND_DE) ? '' : lang === 'de' ? KIND_DE[v]
+  : v.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()));
+
 /** Treffer aus Photon (GeoJSON-Features). */
-export function parsePhoton(json) {
+export function parsePhoton(json, lang = 'de') {
   return (json?.features ?? []).map(f => {
     const p = f.properties ?? {}, [lon, lat] = f.geometry?.coordinates ?? [];
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     const name = p.name ?? [p.street, p.housenumber].filter(Boolean).join(' ');
     if (!name) return null;
     const detail = [p.city !== name ? p.city : null, p.state, p.country].filter(Boolean).join(', ');
-    return { name, kind: KIND_DE[p.osm_value] ?? '', detail, lat, lon, zoom: ZOOM_OSM[p.osm_value] ?? 15, ch: inCH(lat, lon) };
+    return { name, kind: kindOf(p.osm_value, lang), detail, lat, lon, zoom: ZOOM_OSM[p.osm_value] ?? 15, ch: inCH(lat, lon) };
   }).filter(Boolean);
 }
 
@@ -57,5 +60,5 @@ export async function searchPlaces(q, { region = 'ch', near = null, lang = 'de',
   }
   let u = `${PHOTON}?q=${encodeURIComponent(q)}&limit=${limit}&lang=${['de', 'en', 'fr'].includes(lang) ? lang : 'default'}`;
   if (near) u += `&lat=${near.lat.toFixed(4)}&lon=${near.lon.toFixed(4)}`;
-  return parsePhoton(await get(u));
+  return parsePhoton(await get(u), lang);
 }

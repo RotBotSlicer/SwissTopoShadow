@@ -77,7 +77,7 @@ function applyRegion() {
   mv.setBase(isCH() ? base : 'map');
   $('base-map').setAttribute('aria-checked', String(base === 'map')); $('base-air').setAttribute('aria-checked', String(base === 'air'));
   $('reg-ch').setAttribute('aria-checked', String(isCH())); $('reg-world').setAttribute('aria-checked', String(!isCH()));
-  $('surface-row').hidden = !isCH(); $('trails-row').hidden = !isCH(); $('world-note').hidden = isCH();
+  $('surface-row').hidden = !isCH(); $('trails-row').hidden = !isCH(); if (typeof applyBuildings === 'function') applyBuildings(); $('world-note').hidden = isCH();
   $('credits').innerHTML = isCH()
     ? `${t('creditsCH')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`
     : `${t('creditsWorld')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`;
@@ -564,6 +564,17 @@ $('area').onclick = computeArea;
 $('time').oninput = () => { if ($('mode').value !== 'shadow') $('mode').value = 'shadow'; draw(); };
 $('mode').onchange = draw;
 $('surface').checked = store.get('surface') ?? true;
+// 3D-Gebäude (Prototyp): nur Schweiz und nur in 3D; Bibliothek wird erst beim Einschalten geladen
+var buildings = null; // var: applyRegion ruft applyBuildings schon vor dieser Zeile auf
+async function applyBuildings() {
+  $('bld-row').hidden = !(isCH() && mv.is3D);
+  const want = $('bld').checked && isCH() && mv.is3D;
+  if (!want && !buildings) return;
+  if (!buildings) { const { Buildings } = await import('./buildings3d.js'); buildings ??= new Buildings(mv.map); }
+  try { await buildings.set(want); } catch (e) { console.error(e); status(t('error', { m: e.message })); }
+}
+$('bld').checked = store.get('buildings3d') ?? false;
+$('bld').onchange = () => { store.set('buildings3d', $('bld').checked); applyBuildings(); };
 $('trails').checked = store.get('trails') ?? true;
 mv.setTrails($('trails').checked);
 $('trails').onchange = () => { store.set('trails', $('trails').checked); mv.setTrails($('trails').checked); };
@@ -575,7 +586,7 @@ $('base-map').onclick = () => { base = 'map'; store.set('base', base); applyRegi
 $('base-air').onclick = () => { base = 'air'; store.set('base', base); applyRegion(); };
 $('t3d').onclick = () => {
   const on = $('t3d').getAttribute('aria-pressed') !== 'true';
-  $('t3d').setAttribute('aria-pressed', String(on)); mv.set3D(on); updateAreaButton();
+  $('t3d').setAttribute('aria-pressed', String(on)); mv.set3D(on).then(applyBuildings); updateAreaButton();
   if (on) toast(t(matchMedia('(pointer: fine)').matches ? 'hint3dDesk' : 'hint3dTouch'));
 };
 $('reg-world').onclick = () => setRegion('world');

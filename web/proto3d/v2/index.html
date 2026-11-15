@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>Prototyp 3D – Variante 2 (swisstopo 3D)</title>
+<style>
+  html, body { margin:0; height:100%; font:14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1d2420; overflow:hidden; }
+  #map { position:fixed; inset:0; }
+  #panel { position:fixed; z-index:2; left:8px; top:calc(8px + env(safe-area-inset-top)); max-width:340px;
+    background:rgba(255,255,255,.92); border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.2); padding:10px 12px; }
+  #panel h1 { font-size:14px; margin:0 0 2px; }
+  .sub { color:#5d6a62; font-size:12px; margin-bottom:8px; }
+  .row { display:flex; gap:6px; align-items:center; margin:6px 0; flex-wrap:wrap; }
+  .seg { display:flex; border:1px solid #d5d5cc; border-radius:8px; overflow:hidden; }
+  .seg button { border:0; background:#fff; padding:6px 10px; font:inherit; cursor:pointer; }
+  .seg button.on { background:#1d2420; color:#fff; }
+  label { display:flex; gap:6px; align-items:center; }
+  input[type=checkbox] { width:18px; height:18px; accent-color:#c8641e; margin:0; }
+  #sun, #msg { color:#5d6a62; font-size:12px; }
+  #hide { position:absolute; right:6px; top:4px; border:0; background:none; font-size:18px; cursor:pointer; }
+  #show { position:fixed; z-index:2; left:8px; top:calc(8px + env(safe-area-inset-top)); display:none;
+    border:0; border-radius:10px; padding:8px 12px; background:rgba(255,255,255,.92); box-shadow:0 2px 12px rgba(0,0,0,.2); font:inherit; }
+  .cesium-widget-credits { font-size:10px !important; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<button id="show">☰ Einstellungen</button>
+<div id="panel">
+  <button id="hide" aria-label="ausblenden">×</button>
+  <h1>3D-Prototyp · Variante 2</h1>
+  <div class="sub">swisstopo-3D-Daten (Gelände, Gebäude, Bäume) mit Luftbild/Landeskarte und unserer Schattenebene. Bösbächibach, 14.11.2026.</div>
+  <div class="row"><span>Karte</span><div class="seg" id="base"><button data-v="luft" class="on">Luftbild</button><button data-v="lk">Landeskarte</button></div></div>
+  <div class="row"><span>Zeit</span><div class="seg" id="time"></div></div>
+  <div class="row"><label><input type="checkbox" id="surface" checked> Gebäude und Bäume (3D)</label></div>
+  <div class="row"><label><input type="checkbox" id="shadow" checked> Unsere Schattenebene</label></div>
+  <div class="row"><label><input type="checkbox" id="cshadow"> Cesium-Echtzeitschatten</label></div>
+  <div id="sun"></div><div id="msg"></div>
+  <div class="sub" style="margin:6px 0 0">Ziehen = drehen um die Mitte · zwei Finger / rechte Maustaste = zoomen · Strg/mittlere Taste = kippen</div>
+</div>
+<script>
+// CesiumJS: lokal (Test) oder von jsDelivr
+const CESIUM_VER = '1.147.0';
+const base = location.search.includes('local') ? '../vendor/cesium/' : `https://cdn.jsdelivr.net/npm/cesium@${CESIUM_VER}/Build/Cesium/`;
+window.CESIUM_BASE_URL = base;
+document.head.insertAdjacentHTML('beforeend', `<link rel="stylesheet" href="${base}Widgets/widgets.css">`);
+const s = document.createElement('script'); s.src = `${base}Cesium.js`; s.onload = start; document.head.append(s);
+
+async function start() {
+  const C = Cesium;
+  C.Ion.defaultAccessToken = undefined;
+  const $ = id => document.getElementById(id);
+  const meta = await (await fetch('../data/meta.json')).json();
+  const [lon, lat] = meta.center;
+  const T3D = 'https://3d.geo.admin.ch';
+
+  const viewer = new C.Viewer('map', {
+    baseLayer: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
+    navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false, infoBox: false,
+    selectionIndicator: false, shadows: false,
+    terrainProvider: await C.CesiumTerrainProvider.fromUrl(`${T3D}/ch.swisstopo.terrain.3d/v1`, { requestVertexNormals: true }),
+  });
+  const scene = viewer.scene;
+  scene.globe.depthTestAgainstTerrain = true;
+  scene.globe.maximumScreenSpaceError = 1.5;
+  scene.skyAtmosphere.show = true; scene.fog.enabled = true;
+  scene.globe.baseColor = C.Color.fromCssColorString('#dfe3da');
+
+  const wmts = (l, ext) => new C.UrlTemplateImageryProvider({
+    url: `https://wmts.geo.admin.ch/1.0.0/${l}/default/current/3857/{z}/{x}/{y}.${ext}`, maximumLevel: 19,
+    credit: new C.Credit('© swisstopo'),
+  });
+  const layers = scene.imageryLayers;
+  const luft = layers.addImageryProvider(wmts('ch.swisstopo.swissimage', 'jpeg'));
+  const lk = layers.addImageryProvider(wmts('ch.swisstopo.pixelkarte-farbe', 'jpeg')); lk.show = false;
+  // Wanderwege ohne minimumLevel (das löst in Cesium eine endlose Rekursion im Bildcache aus)
+  const wander = layers.addImageryProvider(wmts('ch.swisstopo.swisstlm3d-wanderwege', 'png')); wander.alpha = 0.9;
+
+  // unsere Schattenebene: Bild über das Rechteck legen (Web-Mercator-Pixel, bei 4 km Ausdehnung vernachlässigbar verzerrt)
+  const lons = meta.shadow_bounds.map(p => p[0]), lats = meta.shadow_bounds.map(p => p[1]);
+  const rect = C.Rectangle.fromDegrees(Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats));
+  let shadowLayer = null;
+  const state = { time: meta.times[0], surface: true, shadow: true, cshadow: false, base: 'luft' };
+  async function setShadow() {
+    if (shadowLayer) layers.remove(shadowLayer, true);
+    shadowLayer = null;
+    if (!state.shadow) return;
+    const url = `../data/shadow_${state.surface ? 'dsm' : 'dtm'}_${state.time.replace(':', '')}.png`;
+    shadowLayer = layers.addImageryProvider(await C.SingleTileImageryProvider.fromUrl(url, { rectangle: rect }));
+  }
+
+  // swisstopo 3D: Gebäude und Bäume (3D Tiles)
+  const tilesets = [];
+  for (const l of ['ch.swisstopo.swissbuildings3d.3d', 'ch.swisstopo.vegetation.3d']) {
+    try {
+      const ts = await C.Cesium3DTileset.fromUrl(`${T3D}/${l}/v1/tileset.json`, { maximumScreenSpaceError: 8 });
+      scene.primitives.add(ts); tilesets.push(ts);
+    } catch (e) { $('msg').textContent = `${l}: ${e.message}`; }
+  }
+
+  // Zeit (für Cesium-Echtzeitschatten und Licht)
+  const iso = t => new Date(`${meta.day}T${t}:00+01:00`).toISOString();
+  function apply() {
+    document.querySelectorAll('#time button').forEach(b => b.classList.toggle('on', b.dataset.v === state.time));
+    document.querySelectorAll('#base button').forEach(b => b.classList.toggle('on', b.dataset.v === state.base));
+    luft.show = state.base === 'luft'; lk.show = state.base === 'lk';
+    tilesets.forEach(t => { t.show = state.surface; });
+    viewer.clock.currentTime = C.JulianDate.fromIso8601(iso(state.time));
+    viewer.clock.shouldAnimate = false;
+    viewer.shadows = state.cshadow;
+    scene.globe.enableLighting = state.cshadow;
+    viewer.terrainShadows = state.cshadow ? C.ShadowMode.ENABLED : C.ShadowMode.DISABLED;
+    if (viewer.shadowMap) { viewer.shadowMap.maximumDistance = 4000; viewer.shadowMap.size = 4096; viewer.shadowMap.softShadows = true; }
+    const su = meta.sun[state.time];
+    $('sun').textContent = `Sonne um ${state.time}: Azimut ${su.az.toFixed(0)}°, Höhe ${su.el.toFixed(1)}°`;
+    setShadow();
+  }
+  const tb = $('time');
+  meta.times.forEach(t => { const b = document.createElement('button'); b.textContent = t; b.dataset.v = t; tb.append(b); });
+  tb.onclick = e => { if (e.target.dataset.v) { state.time = e.target.dataset.v; apply(); } };
+  $('base').onclick = e => { if (e.target.dataset.v) { state.base = e.target.dataset.v; apply(); } };
+  $('surface').onchange = e => { state.surface = e.target.checked; apply(); };
+  $('shadow').onchange = e => { state.shadow = e.target.checked; apply(); };
+  $('cshadow').onchange = e => { state.cshadow = e.target.checked; apply(); };
+  $('hide').onclick = () => { $('panel').style.display = 'none'; $('show').style.display = 'block'; };
+  $('show').onclick = () => { $('panel').style.display = ''; $('show').style.display = 'none'; };
+
+  // Marker und Kamera (wie Variante 1: Blick nach Süden über den Punkt)
+  const h = (await C.sampleTerrainMostDetailed(viewer.terrainProvider, [C.Cartographic.fromDegrees(lon, lat)]))[0].height;
+  viewer.entities.add({ position: C.Cartesian3.fromDegrees(lon, lat, h), point: { pixelSize: 12, color: C.Color.fromCssColorString('#d4442e'), outlineColor: C.Color.WHITE, outlineWidth: 2, disableDepthTestDistance: 1e9 } });
+  viewer.camera.lookAt(C.Cartesian3.fromDegrees(lon, lat, h), new C.HeadingPitchRange(C.Math.toRadians(205), C.Math.toRadians(-24), 2300));
+  viewer.camera.lookAtTransform(C.Matrix4.IDENTITY);
+  apply();
+  window.__viewer = viewer;
+}
+</script>
+</body>
+</html>

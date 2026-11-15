@@ -15,6 +15,14 @@
 <body>
 <div id="map"></div>
 
+<!-- Profil (Horizont und Sonnenbahnen) oben über der Karte, unabhängig vom Menü -->
+<div id="profile" hidden>
+  <div class="phead"><span id="psum"></span><button id="pclose" aria-label="Profil ausblenden">×</button></div>
+  <svg id="chart" viewBox="0 0 640 230" aria-label="Horizont und Sonnenbahn"></svg>
+  <div class="plegend small"><span class="sw sw-day"></span><span id="lg-day">gewählter Tag</span>
+    <span class="sw sw-sum"></span><span id="lg-sum">längster Tag</span><span class="sw sw-win"></span><span id="lg-win">kürzester Tag</span></div>
+</div>
+
 <div id="sheet">
   <div class="grip" id="grip"></div>
   <div id="timebox" hidden>
@@ -34,6 +42,7 @@
     <input id="date" type="date" aria-label="Datum">
     <button id="today" title="Heute">Heute</button>
     <button id="locate" title="Mein Standort" aria-label="Mein Standort">◎</button>
+    <button id="ptoggle" aria-pressed="true" title="Profil ein-/ausblenden">Profil</button>
   </div>
 
   <div id="area-box">
@@ -55,7 +64,6 @@
     <div class="big" id="summary"></div>
     <div id="ivs"></div>
     <div id="canopy" class="mut small"></div>
-    <svg id="chart" viewBox="0 0 640 240" aria-label="Horizont und Sonnenbahn"></svg>
   </div>
   <div id="hint" class="mut">Tippe auf die Karte, um die Sonnenzeiten an einem Ort zu sehen.</div>
   <div id="status" class="mut small"></div>

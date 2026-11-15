@@ -2,7 +2,9 @@
 
 Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhenmodellen von swisstopo.
 
-- **Ort antippen:** Sonnenzeiten am Punkt, Diagramm Horizont gegen Sonnenbahn.
+- **Ort antippen:** Sonnenzeiten am Punkt. Profil oben über der Karte (Schalter „Profil“): Horizont, Sonnenbahn des
+  gewählten Tages sowie des längsten und kürzesten Tages; beim Zeitschieber zeigt ein Kreis den aktuellen Sonnenstand.
+  Auf der Südhalbkugel ist Norden in der Mitte.
 - **Schatten für Ausschnitt:** Schatten über der Landeskarte mit Zeitschieber und Animation,
   oder Sonnenstunden des Tages als Farbkarte. Gerechnet auf der Grafikkarte (WebGL2).
 - **Gebiet Schweiz / Weltweit (Schalter):** Schweiz mit swisstopo (Landeskarte, Gelände bis 2 m, Wald).

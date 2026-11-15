@@ -4,7 +4,7 @@ import { Pyramid } from './lib/tiles.js';
 import { loadTerrainLod, lodForPixelSize, withSurface, LOD_DEFAULT } from './lib/loaders.js';
 import { loadTerrainWorld, lodWorldForPixelSize } from './lib/copernicus.js';
 import { pointHorizon, litTimeline, intervals } from './lib/horizon.js';
-import { sunPositionGrid, sunPositionGridGrad } from './lib/sun.js';
+import { sunPosition, sunPositionGrid, sunPositionGridGrad } from './lib/sun.js';
 import { LV95, localTM } from './lib/coords.js';
 import { mercatorGrid, gridSizeFor } from './lib/area.js';
 import { ShadowRenderer } from './lib/gpu.js';
@@ -22,7 +22,7 @@ const inCH = (lat, lon) => lat > 45.8 && lat < 47.85 && lon > 5.9 && lon < 10.55
 /** Projektion für einen Ort: Schweiz LV95, sonst lokale Transversale Mercator um den Ort */
 const projFor = (lat, lon) => (isCH() ? LV95 : localTM(+lat.toFixed(4), +lon.toFixed(4)));
 const lodName = lod => {
-  if (!isCH()) return `${lod[0].res} m Copernicus`;
+  if (!isCH()) return `${lod[0].res} m`;
   const g = lod.find(l => l.ground) ?? lod[0];
   const base = g.src === 'alti3d' ? '2 m' : g.src === 'regio' ? '10 m' : `${g.res} m`;
   return lod.some(l => l.src === 'surface') ? `${base} + Wald` : base;
@@ -155,28 +155,91 @@ function renderPoint() {
   $('canopy').textContent = !isCH() ? 'Copernicus 30 m (Oberflächenmodell, Wald grob enthalten)' : cp == null ? 'ohne Wald und Gebäude'
     : cp > 3 ? `mit Wald und Gebäude · der Punkt liegt unter Bäumen oder an einem Gebäude (Oberfläche ${Math.round(cp)} m über Boden)`
       : 'mit Wald und Gebäude';
+  $('psum').textContent = `${$('summary').textContent} · ${intervals(times, lit).map(([a, b]) => `${fmtTime(a)}–${fmtTime(b)}`).join(', ') || '–'}`;
   drawChart(az, h, times, E, N, lit, proj);
 }
 
+// ------------------------------------------------------------ Profil (Horizont + Sonnenbahnen)
+const profileOn = () => $('ptoggle').getAttribute('aria-pressed') === 'true';
+function setProfile(on) {
+  $('ptoggle').setAttribute('aria-pressed', String(on)); store.set('profile', on);
+  updateProfileVisibility();
+}
+function updateProfileVisibility() {
+  const show = profileOn() && !!pointTerrain;
+  $('profile').hidden = !show;
+  document.body.classList.toggle('has-profile', show);
+  if (show) document.body.style.setProperty('--ph', `${$('profile').offsetHeight}px`);
+}
+
+/** Tage mit längstem und kürzestem Tag im Jahr des gewählten Datums (am Ort, nach Tageslänge). */
+function extremeDays(year, E, N, proj) {
+  const len = day => {
+    const t0 = dayStart(day); let n = 0;
+    for (let m = 0; m < 1440; m += 10) if (sunPositionGrid(t0 + 60 * m, E, N, proj).el > -0.833) n++;
+    return n;
+  };
+  // Sonnenwende = Tag mit extremer Deklination (ortsunabhängig): Sonnenhöhe am Nordpol ≈ Deklination
+  const scan = mon => {
+    let best = null;
+    for (let d = 16; d <= 26; d++) {
+      const day = `${year}-${mon}-${String(d).padStart(2, '0')}`;
+      const decl = sunPosition(Date.parse(`${day}T12:00:00Z`) / 1000, 90, 0, false).el;
+      if (!best || (mon === '06' ? decl > best.decl : decl < best.decl)) best = { day, decl };
+    }
+    return best.day;
+  };
+  const jun = scan('06'), dec = scan('12');
+  return len(jun) >= len(dec) ? { long: jun, short: dec } : { long: dec, short: jun }; // Südhalbkugel: umgekehrt
+}
+
+let chartGeom = null;
 function drawChart(az, h, times, E, N, lit, proj) {
-  const W = 640, H = 240, L0 = 34, B = 24, T = 8, R = 8;
+  const W = 640, H = 230, L0 = 30, B = 22, T = 6, R = 6;
+  const lat = proj.toLatLon(E, N).lat;
+  const center = lat >= 0 ? 180 : 0; // Mitte der Grafik: Süden (Nordhalbkugel) bzw. Norden
+  const rel = a => ((a - center + 540) % 360) - 180;
+  const year = $('date').value.slice(0, 4), ex = extremeDays(year, E, N, proj);
+  const path = day => { const t0 = dayStart(day); return Array.from({ length: 1440 / 2 }, (_, i) => ({ u: t0 + 120 * i, ...sunPositionGrid(t0 + 120 * i, E, N, proj) })); };
+  const sLong = path(ex.long), sShort = path(ex.short);
   const suns = times.map(u => sunPositionGrid(u, E, N, proj));
-  const vis = az.map((a, i) => (a >= 45 && a <= 315 ? h[i] : 0));
-  const maxEl = Math.ceil((Math.max(30, ...suns.map(s => s.el), ...vis) + 3) / 10) * 10;
-  const x = a => L0 + (a - 45) / 270 * (W - L0 - R), y = e => H - B - Math.max(0, e) / maxEl * (H - B - T);
-  let d = `M${x(45)},${y(0)}`;
-  az.forEach((a, i) => { if (a >= 45 && a <= 315) d += `L${x(a).toFixed(1)},${y(h[i]).toFixed(1)}`; });
-  d += `L${x(315)},${y(0)}Z`;
-  let path = '', dots = '', ticks = '', axes = '';
-  suns.forEach(({ az: a, el }, i) => {
-    if (el < -0.5 || a < 45 || a > 315) return;
-    path += `${path ? 'L' : 'M'}${x(a).toFixed(1)},${y(el).toFixed(1)}`;
-    if (lit[i]) dots += `<circle cx="${x(a).toFixed(1)}" cy="${y(el).toFixed(1)}" r="3" fill="#e8820c"/>`;
-    if (i % 60 === 0) ticks += `<text x="${x(a)}" y="${y(el) - 7}" font-size="12" text-anchor="middle" fill="#3d4a42">${i / 60}h</text>`;
+  const up = [...sLong, ...suns].filter(s => s.el > -1).map(s => rel(s.az));
+  const r0 = Math.max(-180, Math.min(-90, Math.floor((Math.min(...up) - 8) / 15) * 15));
+  const r1 = Math.min(180, Math.max(90, Math.ceil((Math.max(...up) + 8) / 15) * 15));
+  const vis = az.map((a, i) => (rel(a) >= r0 && rel(a) <= r1 ? h[i] : 0));
+  const maxEl = Math.ceil((Math.max(30, ...sLong.map(s => s.el), ...vis) + 3) / 10) * 10;
+  const x = r => L0 + (r - r0) / (r1 - r0) * (W - L0 - R), y = e => H - B - Math.max(0, e) / maxEl * (H - B - T);
+  chartGeom = { x, y, rel, E, N, proj };
+  // Horizont (nach relativem Azimut sortiert)
+  const hz = az.map((a, i) => [rel(a), h[i]]).filter(([r]) => r >= r0 && r <= r1).sort((p, q) => p[0] - q[0]);
+  let d = `M${x(r0)},${y(0)}`; hz.forEach(([r, v]) => { d += `L${x(r).toFixed(1)},${y(v).toFixed(1)}`; }); d += `L${x(r1)},${y(0)}Z`;
+  const line = list => { let s = '', prev = null; list.forEach(p => { if (p.el < -0.5) { prev = null; return; } const r = rel(p.az); const pt = `${x(r).toFixed(1)},${y(p.el).toFixed(1)}`; s += (prev === null || Math.abs(r - prev) > 90 ? 'M' : 'L') + pt; prev = r; }); return s; };
+  let dots = '', ticks = '', axes = '';
+  suns.forEach((p, i) => {
+    if (p.el < -0.5) return;
+    const r = rel(p.az);
+    if (r < r0 || r > r1) return;
+    if (lit[i] && i % 3 === 0) dots += `<circle cx="${x(r).toFixed(1)}" cy="${y(p.el).toFixed(1)}" r="2.6" fill="#e8820c"/>`;
+    if (i % 60 === 0) ticks += `<text x="${x(r)}" y="${y(p.el) - 6}" font-size="11" text-anchor="middle" fill="#3d4a42">${fmtTime(p.u ?? times[i]).slice(0, 2)}h</text>`;
   });
-  for (const [a, l] of [[90, 'O'], [135, 'SO'], [180, 'S'], [225, 'SW'], [270, 'W']]) axes += `<text x="${x(a)}" y="${H - 6}" font-size="11" text-anchor="middle" fill="#5d6a62">${l}</text>`;
-  for (let e = 0; e <= maxEl; e += 10) axes += `<line x1="${L0}" x2="${W - R}" y1="${y(e)}" y2="${y(e)}" stroke="#e6e6e0"/><text x="${L0 - 5}" y="${y(e) + 4}" font-size="10" text-anchor="end" fill="#5d6a62">${e}°</text>`;
-  $('chart').innerHTML = `${axes}<path d="${d}" fill="#8a9a78" opacity=".85"/><path d="${path}" fill="none" stroke="#d9822b" stroke-width="1.5" stroke-dasharray="5 3"/>${dots}${ticks}`;
+  const names = { 0: 'N', 45: 'NO', 90: 'O', 135: 'SO', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+  for (const [a, l] of Object.entries(names)) { const r = rel(+a); if (r >= r0 && r <= r1) axes += `<text x="${x(r)}" y="${H - 5}" font-size="11" text-anchor="middle" fill="#5d6a62">${l}</text>`; }
+  for (let e = 0; e <= maxEl; e += 10) axes += `<line x1="${L0}" x2="${W - R}" y1="${y(e)}" y2="${y(e)}" stroke="#e6e6e0"/><text x="${L0 - 4}" y="${y(e) + 4}" font-size="10" text-anchor="end" fill="#5d6a62">${e}°</text>`;
+  $('chart').innerHTML = `${axes}<path d="${d}" fill="#8a9a78" opacity=".85"/>`
+    + `<path d="${line(sLong)}" fill="none" stroke="#c9a227" stroke-width="1.4" stroke-dasharray="4 3"/>`
+    + `<path d="${line(sShort)}" fill="none" stroke="#5a7fb0" stroke-width="1.4" stroke-dasharray="4 3"/>`
+    + `<path d="${line(suns)}" fill="none" stroke="#d9822b" stroke-width="1.6"/>${dots}${ticks}<g id="nowmark"></g>`;
+  const fd = day => new Date(`${day}T12:00:00Z`).toLocaleDateString('de-CH', { day: 'numeric', month: 'numeric', timeZone: 'UTC' });
+  $('lg-day').textContent = fd($('date').value); $('lg-sum').textContent = `längster Tag (${fd(ex.long)})`; $('lg-win').textContent = `kürzester Tag (${fd(ex.short)})`;
+  updateProfileVisibility();
+}
+
+/** Markiert den Sonnenstand zur Zeit u (Zeitschieber) im Profil. */
+function markProfile(u) {
+  const g = document.getElementById('nowmark');
+  if (!g || !chartGeom) return;
+  const { x, y, rel, E, N, proj } = chartGeom, s = sunPositionGrid(u, E, N, proj);
+  g.innerHTML = s.el > -0.5 ? `<line x1="${x(rel(s.az))}" x2="${x(rel(s.az))}" y1="${y(0)}" y2="${y(s.el)}" stroke="#d4442e" stroke-width="1" stroke-dasharray="2 2"/><circle cx="${x(rel(s.az))}" cy="${y(s.el)}" r="5" fill="none" stroke="#d4442e" stroke-width="2"/>` : '';
 }
 
 map.on('click', e => showPoint(e.latlng.lat, e.latlng.lng));
@@ -203,7 +266,7 @@ function updateAreaButton() {
   const px = Math.max(s.widthM / s.w, s.heightM / s.h);
   $('area').disabled = big;
   $('area').textContent = big ? 'Für Schatten näher zoomen'
-    : `Schatten berechnen (${lodName(areaLod(px))})`;
+    : `Schatten · ${lodName(areaLod(px))}`;
 }
 
 async function computeArea() {
@@ -278,6 +341,7 @@ function draw() {
     renderer.renderShadow(s.az, s.el, { rMax: R_MAX, grad: s.grad });
     selectedMinute = (s.u - dayStart($('date').value)) / 60;
     $('timelbl').textContent = fmtTime(s.u);
+    if (pointTerrain) { const tz = TZ; markProfile(s.u); TZ = tz; }
   });
 }
 
@@ -309,6 +373,9 @@ $('area').onclick = computeArea;
 $('time').oninput = () => { if ($('mode').value !== 'shadow') $('mode').value = 'shadow'; draw(); };
 $('mode').onchange = draw;
 $('surface').checked = store.get('surface') ?? true;
+$('ptoggle').setAttribute('aria-pressed', String(store.get('profile') ?? true));
+$('ptoggle').onclick = () => setProfile(!profileOn());
+$('pclose').onclick = () => setProfile(false);
 $('reg-ch').onclick = () => setRegion('ch');
 $('reg-world').onclick = () => setRegion('world');
 $('surface').onchange = () => {

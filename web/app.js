@@ -11,6 +11,11 @@ import { ShadowRenderer } from './lib/gpu.js';
 import { tzlookup } from 'tz-lookup';
 
 const $ = id => document.getElementById(id);
+// Fehler sichtbar machen (z. B. auf dem Handy ohne Entwicklerwerkzeuge)
+const showError = e => { const el = document.getElementById('status'); if (el) el.textContent = `Fehler: ${e?.message ?? e}`; };
+window.addEventListener('error', ev => showError(ev.error ?? ev.message));
+window.addEventListener('unhandledrejection', ev => showError(ev.reason));
+const VERSION = (document.querySelector('meta[name="app-version"]')?.content ?? '').slice(0, 7);
 const R_MAX = 30000, STEP_MIN = 5, MAX_AREA_M = 50000, GRID_PX = 900;
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
 
@@ -59,8 +64,8 @@ function applyRegion() {
   $('reg-ch').setAttribute('aria-checked', String(isCH())); $('reg-world').setAttribute('aria-checked', String(!isCH()));
   $('surface-row').hidden = !isCH(); $('world-note').hidden = isCH();
   $('credits').innerHTML = isCH()
-    ? 'Karte und Höhendaten © swisstopo · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a>'
-    : 'Höhen: Copernicus DEM GLO-30 © DLR/Airbus, ESA · Karte © OpenTopoMap, OpenStreetMap · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a>';
+    ? `Karte und Höhendaten © swisstopo · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`
+    : `Höhen: Copernicus DEM GLO-30 © DLR/Airbus, ESA · Karte © OpenTopoMap, OpenStreetMap · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`;
   updateAreaButton();
 }
 function setRegion(r) {

@@ -191,6 +191,21 @@ export class ShadowRenderer {
     gl.viewport(0, 0, this.w, this.h);
     gl.uniform1i(this.u.uMode, mode);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    const k = this.hole;
+    if (!toFbo && k) { // Loch in der Anzeige (dort liegt eine feinere Ebene darüber)
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(k.c0, this.h - k.r1, k.c1 - k.c0, k.r1 - k.r0);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.disable(gl.SCISSOR_TEST);
+    }
+  }
+
+  /** Anzeige im Pixelbereich [c0,c1)×[r0,r1) (Zeile 0 = oben) durchsichtig lassen; null = kein Loch. */
+  setHole(rect) {
+    if (!rect) { this.hole = null; return; }
+    const cl = (v, m) => Math.max(0, Math.min(m, Math.round(v)));
+    const k = { c0: cl(rect.c0, this.w), c1: cl(rect.c1, this.w), r0: cl(rect.r0, this.h), r1: cl(rect.r1, this.h) };
+    this.hole = k.c1 > k.c0 && k.r1 > k.r0 ? k : null;
   }
 
   /** Schatten für eine Sonnenposition (Gitterazimut!) auf die Anzeige zeichnen. */

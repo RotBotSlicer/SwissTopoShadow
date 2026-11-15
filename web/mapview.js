@@ -75,6 +75,38 @@ export class MapView {
     return { south: lat(y + h / 2), north: lat(y - h / 2), west: lon(x - w / 2), east: lon(x + w / 2) };
   }
 
+  /** Boden-Punkte unter einem Raster von Bildschirmpunkten (Zeilen yFrom..yTo als Anteil der Höhe). */
+  _footprint(yFrom, yTo, maxDistM = 120000) {
+    const m = this.map, cv = m.getCanvas(), w = cv.clientWidth, h = cv.clientHeight, c = m.getCenter(), pts = [];
+    for (let j = 0; j <= 8; j++) for (let i = 0; i <= 8; i++) {
+      const p = m.unproject([w * i / 8, h * (yFrom + (yTo - yFrom) * j / 8)]);
+      if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
+      if (c.distanceTo(p) > maxDistM) continue;
+      pts.push(p);
+    }
+    return pts;
+  }
+  static _bbox(pts) {
+    return { south: Math.min(...pts.map(p => p.lat)), north: Math.max(...pts.map(p => p.lat)), west: Math.min(...pts.map(p => p.lng)), east: Math.max(...pts.map(p => p.lng)) };
+  }
+  /** 3D: feiner Bereich = Boden unter der unteren Bildhälfte (nahe Kamera). */
+  nearBounds() {
+    if (!this.is3D || this.map.getPitch() < 1) return this.viewBounds();
+    const pts = this._footprint(0.5, 1);
+    return pts.length > 3 ? MapView._bbox(pts) : this.viewBounds();
+  }
+  /** 3D: grober Bereich = ganzer sichtbarer Boden bis zum Horizont, höchstens ±halfM um die Mitte von near. */
+  farBounds(near, halfM = 30000) {
+    const pts = this._footprint(0.0, 1, 150000);
+    const b = pts.length > 3 ? MapView._bbox(pts) : near;
+    const lat0 = (near.south + near.north) / 2, lon0 = (near.west + near.east) / 2;
+    const dLat = halfM / 111320, dLon = halfM / (111320 * Math.cos(lat0 * Math.PI / 180));
+    return {
+      south: Math.max(Math.min(b.south, near.south), lat0 - dLat), north: Math.min(Math.max(b.north, near.north), lat0 + dLat),
+      west: Math.max(Math.min(b.west, near.west), lon0 - dLon), east: Math.min(Math.max(b.east, near.east), lon0 + dLon),
+    };
+  }
+
   onClick(cb) { this.map.on('click', e => cb(e.lngLat.lat, e.lngLat.lng)); }
   onMoveEnd(cb) { this.map.on('moveend', cb); }
 
@@ -127,32 +159,40 @@ export class MapView {
     } else this.marker.setLngLat([lon, lat]);
   }
 
-  // ---------------------------------------------------------------- Schattenebene (WebGL-Canvas als Kartenquelle)
-  /** canvas: Zeichenfläche des ShadowRenderer; b: {south, west, north, east} (Web-Mercator-Pixelgitter) */
-  async setOverlay(canvas, b) {
+  // ---------------------------------------------------------------- Schattenebenen (WebGL-Canvas als Kartenquelle)
+  // Mehrere Ebenen möglich (3D: 'far' grob bis zum Horizont, darüber 'near' fein). Reihenfolge = Aufrufreihenfolge.
+  /** canvas: Zeichenfläche eines ShadowRenderer; b: {south, west, north, east} (Web-Mercator-Pixelgitter) */
+  async setOverlay(id, canvas, b) {
     await this.ready;
+    this.overlays ??= new Map();
     const coords = [[b.west, b.north], [b.east, b.north], [b.east, b.south], [b.west, b.south]];
-    this.removeOverlay();
-    this.map.addSource('shadow', { type: 'canvas', canvas, coordinates: coords, animate: false });
-    this.map.addLayer({ id: 'shadow', type: 'raster', source: 'shadow', paint: { 'raster-fade-duration': 0, 'raster-resampling': 'linear' } });
-    this.overlay = this.map.getSource('shadow');
-    this.overlayChanged();
+    this.removeOverlay(id);
+    const sid = `shadow-${id}`;
+    this.map.addSource(sid, { type: 'canvas', canvas, coordinates: coords, animate: false });
+    this.map.addLayer({ id: sid, type: 'raster', source: sid, paint: { 'raster-fade-duration': 0, 'raster-resampling': 'linear' } });
+    this.overlays.set(id, this.map.getSource(sid));
+    this.overlayChanged(id);
   }
-  removeOverlay() {
-    if (this.map.getLayer('shadow')) this.map.removeLayer('shadow');
-    if (this.map.getSource('shadow')) this.map.removeSource('shadow');
-    this.overlay = null;
+  /** Ebene id entfernen (ohne id: alle). */
+  removeOverlay(id) {
+    for (const k of id ? [id] : [...(this.overlays?.keys() ?? [])]) {
+      const sid = `shadow-${k}`;
+      if (this.map.getLayer(sid)) this.map.removeLayer(sid);
+      if (this.map.getSource(sid)) this.map.removeSource(sid);
+      this.overlays?.delete(k);
+    }
   }
-  /** Nach jedem Neuzeichnen des Canvas aufrufen: Inhalt in die Karte übernehmen.
+  /** Nach jedem Neuzeichnen aufrufen (ohne id: alle Ebenen): Inhalt in die Karte übernehmen.
    *  play/pause lädt das Canvas neu in die Textur. In 3D zeichnet MapLibre das Gelände über einen
    *  Zwischenspeicher (render to texture), der davon nichts merkt – setCoordinates meldet die Quelle als
    *  geändert, damit dieser Zwischenspeicher neu gezeichnet wird. */
-  overlayChanged() {
-    const s = this.overlay;
-    if (!s) return;
-    s.play();
-    if (this.is3D) s.setCoordinates(s.coordinates);
-    clearTimeout(this._pause);
-    this._pause = setTimeout(() => { if (this.overlay === s) s.pause(); }, 250);
+  overlayChanged(id) {
+    for (const [k, s] of this.overlays ?? []) {
+      if (id && k !== id) continue;
+      s.play();
+      if (this.is3D) s.setCoordinates(s.coordinates);
+      clearTimeout(s._pauseT);
+      s._pauseT = setTimeout(() => s.pause(), 250);
+    }
   }
 }

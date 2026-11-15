@@ -76,7 +76,7 @@ function setRegion(r) {
   if (r === region) return;
   region = r; store.set('region', r);
   // Ausschnitt und Punkt gehören zum alten Gebiet
-  mv.removeOverlay(); renderer = null;
+  mv.removeOverlay(); for (const k in renderers) delete renderers[k];
   area = null; $('timebox').hidden = true; $('legend').hidden = true; $('area-status').textContent = '';
   applyRegion();
   if (pointTerrain) showPoint(pointTerrain.lat, pointTerrain.lon);
@@ -242,11 +242,16 @@ function markProfile(u) {
 mv.onClick((lat, lon) => showPoint(lat, lon));
 
 // ------------------------------------------------------------ Ausschnitt / Schatten
-let area = null, renderer = null, suns = [], playing = false, hours = null, selectedMinute = null;
+// Ein Ausschnitt besteht aus 1–2 Ebenen: 'near' (fein, im 2D der ganze Ausschnitt) und in schräger 3D-Ansicht
+// zusätzlich 'far' (grob, ganzer sichtbarer Boden bis zum Horizont, unter near liegend, mit Loch unter near).
+let area = null, suns = [], playing = false, hours = null, selectedMinute = null;
+const renderers = {}; // id -> ShadowRenderer (werden wiederverwendet)
 
-const viewBounds = () => mv.viewBounds();
+const viewBounds = () => mv.nearBounds();
 const minPx = () => (isCH() ? 3 : 10); // weltweit: Daten 30 m, feinere Pixel bringen nichts
+const FAR_MIN_PX = 20;
 function viewProj() { const c = mv.center(); return projFor(c.lat, c.lon); }
+const farLod = px => (isCH() ? lodForPixelSize(px) : lodWorldForPixelSize(px)); // fern: ohne Wald/Gebäude
 function updateAreaButton() {
   if (!$('area')) return;
   const c = mv.center();
@@ -260,31 +265,61 @@ function updateAreaButton() {
   const px = Math.max(s.widthM / s.w, s.heightM / s.h);
   $('area').disabled = big;
   $('area').textContent = big ? 'Für Schatten näher zoomen'
-    : `Schatten · ${lodName(areaLod(px))}`;
+    : `Schatten · ${lodName(areaLod(px))}${wantFar(b) ? ' + Fernbereich' : ''}`;
+}
+/** Fernbereich nur, wenn die 3D-Ansicht deutlich mehr Boden zeigt als der feine Bereich. */
+function wantFar(near) {
+  if (!mv.is3D || mv.map.getPitch() < 15) return null;
+  const far = mv.farBounds(near, R_MAX);
+  const f = (b) => (b.north - b.south) * (b.east - b.west);
+  return f(far) > 1.5 * f(near) ? far : null;
+}
+const mercX = lon => (lon + 180) / 360;
+const mercY = lat => { const s = Math.sin(lat * Math.PI / 180); return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI); };
+/** Pixelrechteck von inner im Gitter outer (beide Web-Mercator), 1 Pixel nach innen versetzt. */
+function holeRect(outer, inner, w, h) {
+  const x = lon => (mercX(lon) - mercX(outer.west)) / (mercX(outer.east) - mercX(outer.west)) * w;
+  const y = lat => (mercY(lat) - mercY(outer.north)) / (mercY(outer.south) - mercY(outer.north)) * h;
+  return { c0: Math.ceil(x(inner.west)) + 1, c1: Math.floor(x(inner.east)) - 1, r0: Math.ceil(y(inner.north)) + 1, r1: Math.floor(y(inner.south)) - 1 };
+}
+
+async function loadLayer(id, b, proj, targetPx, lodOf, label) {
+  const { w, h } = gridSizeFor(b, targetPx, GRID_PX, proj);
+  const grid = mercatorGrid(b, w, h, proj), lod = lodOf(grid.pixelSize);
+  const terrain = isCH()
+    ? await loadTerrainLod(grid.bboxLv95, await pyramid(), {
+      rMax: R_MAX, lod, onProgress: (n, tot) => { $('area-status').textContent = `${label}: lade 2-m-Kacheln ${n}/${tot}…`; },
+    })
+    : await loadTerrainWorld(grid.bboxLv95, proj, { rMax: R_MAX, lod });
+  const r = renderers[id] ??= new ShadowRenderer(document.createElement('canvas'));
+  r.setTerrain(terrain, grid.center);
+  r.setGrid(grid);
+  r.setHole(null);
+  return { id, b, grid, terrain, lod, renderer: r, suns: [] };
 }
 
 async function computeArea() {
-  const b = viewBounds(), proj = viewProj(), { w, h } = gridSizeFor(b, minPx(), GRID_PX, proj);
-  const grid = mercatorGrid(b, w, h, proj);
-  const lod = areaLod(grid.pixelSize);
+  const b = viewBounds(), proj = viewProj(), farB = wantFar(b);
   const c = mv.center(); setTZ(c.lat, c.lon);
   $('area').disabled = true;
   try {
     $('area-status').textContent = 'Lade Höhendaten…';
-    const terrain = isCH()
-      ? await loadTerrainLod(grid.bboxLv95, await pyramid(), {
-        rMax: R_MAX, lod, onProgress: (n, tot) => { $('area-status').textContent = `Lade 2-m-Kacheln ${n}/${tot}…`; },
-      })
-      : await loadTerrainWorld(grid.bboxLv95, proj, { rMax: R_MAX, lod });
-    $('area-status').textContent = 'Bereite Grafikkarte vor…';
-    renderer ??= new ShadowRenderer(document.createElement('canvas'));
-    renderer.setTerrain(terrain, grid.center);
-    renderer.setGrid(grid);
-    area = { grid, terrain, lod, proj, tz: TZ };
+    const near = await loadLayer('near', b, proj, minPx(), areaLod, 'Nah');
+    const layers = [near];
+    if (farB) {
+      $('area-status').textContent = 'Lade Höhendaten Fernbereich…';
+      const far = await loadLayer('far', farB, proj, FAR_MIN_PX, farLod, 'Fern');
+      far.renderer.setHole(holeRect(farB, b, far.grid.w, far.grid.h));
+      layers.unshift(far); // zuerst (unten) zeichnen
+    }
+    area = { layers, near, proj, tz: TZ, grid: near.grid, terrain: near.terrain, lod: near.lod };
     hours = null;
-    await mv.setOverlay(renderer.canvas, b);
+    mv.removeOverlay();
+    for (const L of layers) await mv.setOverlay(L.id, L.renderer.canvas, L.b);
     prepareDay();
-    $('area-status').textContent = `${w}×${h} Pixel à ${grid.pixelSize.toFixed(1)} m · Gelände ${lodName(lod)}`;
+    const g = near.grid, fr = layers.length > 1 ? layers[0] : null;
+    $('area-status').textContent = `${g.w}×${g.h} Pixel à ${g.pixelSize.toFixed(1)} m · Gelände ${lodName(near.lod)}`
+      + (fr ? ` · Fernbereich ${(Math.max(fr.grid.w * fr.grid.pixelSize, fr.grid.h * fr.grid.pixelSize) / 1000).toFixed(0)} km à ${fr.grid.pixelSize.toFixed(0)} m` : '');
     $('sheet').classList.add('collapsed'); // Karte freigeben, Zeitschieber bleibt sichtbar
   } catch (e) {
     console.error(e); $('area-status').textContent = 'Fehler: ' + e.message;
@@ -294,11 +329,18 @@ async function computeArea() {
 function prepareDay() {
   if (!area) return;
   TZ = area.tz;
-  const t0 = dayStart($('date').value), { E, N } = area.grid.center;
+  const t0 = dayStart($('date').value), { E, N } = area.near.grid.center;
   suns = [];
+  for (const L of area.layers) L.suns = [];
   for (let m = 0; m < 1440; m += STEP_MIN) {
     const u = t0 + 60 * m, s = sunPositionGridGrad(u, E, N, area.proj);
-    if (s.el > -1.5) suns.push({ u, ...s });
+    if (s.el > -1.5) {
+      suns.push({ u, ...s });
+      // gleiche Zeitschritte für alle Ebenen, Sonnenrichtung je Ebenenmitte
+      for (const L of area.layers) {
+        L.suns.push(L === area.near ? { u, ...s } : { u, ...sunPositionGridGrad(u, L.grid.center.E, L.grid.center.N, area.proj) });
+      }
+    }
   }
   $('timebox').hidden = false;
   const tEl = $('time');
@@ -324,13 +366,13 @@ function draw() {
       const mx = suns.length * STEP_MIN / 60;
       $('legend').innerHTML = `<span>0 h</span><span class="ramp" style="background:linear-gradient(90deg,#29337a,#338c8c,#f2d94d,#ed731a)"></span><span>${mx.toFixed(1)} h</span>`;
       if (hours === null) computeHours(mx);
-      else if (hours.done) { renderer.showSunHours(STEP_MIN, mx); mv.overlayChanged(); }
+      else if (hours.done) { for (const L of area.layers) L.renderer.showSunHours(STEP_MIN, mx); mv.overlayChanged(); }
       return;
     }
-    const s = suns[+$('time').value];
+    const i = +$('time').value, s = suns[i];
     if (!s) return;
     TZ = area.tz;
-    renderer.renderShadow(s.az, s.el, { rMax: R_MAX, grad: s.grad });
+    for (const L of area.layers) { const t = L.suns[i]; L.renderer.renderShadow(t.az, t.el, { rMax: R_MAX, grad: t.grad }); }
     mv.overlayChanged();
     selectedMinute = (s.u - dayStart($('date').value)) / 60;
     $('timelbl').textContent = fmtTime(s.u);
@@ -341,13 +383,15 @@ function draw() {
 // Sonnenstunden in Paketen pro Bild rechnen, damit die Oberfläche bedienbar bleibt
 function computeHours(mx) {
   const job = hours = { done: false, i: 0 };
-  renderer.beginSunHours();
+  for (const L of area.layers) L.renderer.beginSunHours();
   const step = () => {
     if (hours !== job || $('mode').value !== 'hours') { if (hours === job) hours = null; return; }
-    const batch = suns.slice(job.i, job.i + 6);
-    renderer.addSunHours(batch, { rMax: R_MAX });
-    job.i += batch.length;
-    renderer.showSunHours(STEP_MIN, mx);
+    const n = Math.min(6, suns.length - job.i);
+    for (const L of area.layers) {
+      L.renderer.addSunHours(L.suns.slice(job.i, job.i + n), { rMax: R_MAX });
+      L.renderer.showSunHours(STEP_MIN, mx);
+    }
+    job.i += n;
     mv.overlayChanged();
     $('area-status').textContent = job.i < suns.length ? `Sonnenstunden ${Math.round(100 * job.i / suns.length)} %` : `Sonnenstunden für ${$('date').value}`;
     if (job.i < suns.length) requestAnimationFrame(step); else job.done = true;

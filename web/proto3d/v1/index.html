@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>Prototyp 3D – Variante 1 (eigenes Gelände)</title>
+<link rel="stylesheet" href="../vendor/maplibre-gl.css">
+<script src="../vendor/maplibre-gl.js"></script>
+<style>
+  html, body { margin:0; height:100%; font:14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1d2420; }
+  #map { position:fixed; inset:0; }
+  #panel { position:fixed; z-index:2; left:8px; top:calc(8px + env(safe-area-inset-top)); max-width:340px;
+    background:rgba(255,255,255,.92); border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.2); padding:10px 12px; }
+  #panel h1 { font-size:14px; margin:0 0 2px; }
+  #panel .sub { color:#5d6a62; font-size:12px; margin-bottom:8px; }
+  .row { display:flex; gap:6px; align-items:center; margin:6px 0; flex-wrap:wrap; }
+  .seg { display:flex; border:1px solid #d5d5cc; border-radius:8px; overflow:hidden; }
+  .seg button { border:0; background:#fff; padding:6px 10px; font:inherit; cursor:pointer; }
+  .seg button.on { background:#1d2420; color:#fff; }
+  label { display:flex; gap:6px; align-items:center; }
+  input[type=checkbox] { width:18px; height:18px; accent-color:#c8641e; margin:0; }
+  #sun { color:#5d6a62; font-size:12px; }
+  #hide { position:absolute; right:6px; top:4px; border:0; background:none; font-size:18px; cursor:pointer; }
+  #show { position:fixed; z-index:2; left:8px; top:calc(8px + env(safe-area-inset-top)); display:none;
+    border:0; border-radius:10px; padding:8px 12px; background:rgba(255,255,255,.92); box-shadow:0 2px 12px rgba(0,0,0,.2); font:inherit; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<button id="show">☰ Einstellungen</button>
+<div id="panel">
+  <button id="hide" aria-label="ausblenden">×</button>
+  <h1>3D-Prototyp · Variante 1</h1>
+  <div class="sub">Eigenes Gelände (swissALTI3D / swissSURFACE3D) mit Landeskarte und unserer Schattenebene. Bösbächibach, 14.11.2026.</div>
+  <div class="row"><span>Karte</span><div class="seg" id="base"><button data-v="luft" class="on">Luftbild</button><button data-v="lk">Landeskarte</button></div></div>
+  <div class="row"><span>Zeit</span><div class="seg" id="time"></div></div>
+  <div class="row"><label><input type="checkbox" id="surface" checked> Wald und Gebäude</label>
+    <label><input type="checkbox" id="shadow" checked> Schatten</label></div>
+  <div class="row"><label>Überhöhung <input type="range" id="exag" min="1" max="2" step="0.1" value="1"></label><span id="exagv">1.0×</span></div>
+  <div id="sun"></div>
+  <div class="sub" style="margin:6px 0 0">Ziehen = verschieben · zwei Finger / rechte Maustaste = drehen und kippen</div>
+</div>
+<script>
+(async () => {
+  const meta = await (await fetch('../data/meta.json')).json();
+  const D = '../data';
+  // Oberfläche nur in den feinen Zoomstufen vorhanden, darunter Boden
+  maplibregl.addProtocol('dsm', async (params) => {
+    const [z, x, y] = params.url.replace('dsm://', '').split('/').map(Number);
+    const url = `${D}/${z >= 14 ? 'dsm' : 'dtm'}/${z}/${x}/${y}.png`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`${r.status} ${url}`);
+    return { data: await r.arrayBuffer() };
+  });
+  const wmts = l => `https://wmts.geo.admin.ch/1.0.0/${l}/default/current/3857/{z}/{x}/{y}.${l.includes('swissimage') ? 'jpeg' : l.includes('wanderwege') ? 'png' : 'jpeg'}`;
+  const attr = '© <a href="https://www.swisstopo.admin.ch">swisstopo</a>';
+  const [lon, lat] = meta.center;
+  const bounds = [lon - 0.55, lat - 0.38, lon + 0.55, lat + 0.38];
+  const state = { time: meta.times[0], surface: true, shadow: true, base: 'luft' };
+  const shadowUrl = () => `${D}/shadow_${state.surface ? 'dsm' : 'dtm'}_${state.time.replace(':', '')}.png`;
+
+  const map = new maplibregl.Map({
+    container: 'map', center: [lon, lat], zoom: 14.6, pitch: 68, bearing: 205, maxPitch: 85,
+    maxBounds: [[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
+    style: {
+      version: 8,
+      sources: {
+        lk: { type: 'raster', tiles: [wmts('ch.swisstopo.pixelkarte-farbe')], tileSize: 256, maxzoom: 18, attribution: attr },
+        luft: { type: 'raster', tiles: [wmts('ch.swisstopo.swissimage')], tileSize: 256, maxzoom: 19, attribution: attr },
+        wander: { type: 'raster', tiles: [wmts('ch.swisstopo.swisstlm3d-wanderwege')], tileSize: 256, maxzoom: 18 },
+        dtm: { type: 'raster-dem', tiles: [`${D}/dtm/{z}/{x}/{y}.png`], tileSize: 256, encoding: 'terrarium', minzoom: 10, maxzoom: 15, bounds },
+        dsm: { type: 'raster-dem', tiles: ['dsm://{z}/{x}/{y}'], tileSize: 256, encoding: 'terrarium', minzoom: 10, maxzoom: 15, bounds },
+        shadow: { type: 'image', url: shadowUrl(), coordinates: meta.shadow_bounds },
+      },
+      layers: [
+        { id: 'bg', type: 'background', paint: { 'background-color': '#dfe3da' } },
+        { id: 'lk', type: 'raster', source: 'lk', layout: { visibility: 'none' } },
+        { id: 'luft', type: 'raster', source: 'luft' },
+        { id: 'wander', type: 'raster', source: 'wander', minzoom: 13, paint: { 'raster-opacity': 0.9 } },
+        { id: 'shadow', type: 'raster', source: 'shadow', paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } },
+      ],
+      terrain: { source: 'dsm', exaggeration: 1 },
+      sky: { 'sky-color': '#a9c8ec', 'horizon-color': '#e8eef4', 'fog-color': '#e8eef4', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.8 },
+    },
+  });
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+  map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
+  new maplibregl.Marker({ color: '#d4442e' }).setLngLat([lon, lat]).addTo(map);
+
+  const $ = id => document.getElementById(id);
+  const tb = $('time');
+  meta.times.forEach(t => { const b = document.createElement('button'); b.textContent = t; b.dataset.v = t; tb.append(b); });
+  const mark = (seg, v) => seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  const sunText = () => { const s = meta.sun[state.time]; $('sun').textContent = `Sonne um ${state.time}: Azimut ${s.az.toFixed(0)}°, Höhe ${s.el.toFixed(1)}°`; };
+  const apply = () => {
+    mark(tb, state.time); mark($('base'), state.base); sunText();
+    map.setLayoutProperty('lk', 'visibility', state.base === 'lk' ? 'visible' : 'none');
+    map.setLayoutProperty('luft', 'visibility', state.base === 'luft' ? 'visible' : 'none');
+    map.setLayoutProperty('shadow', 'visibility', state.shadow ? 'visible' : 'none');
+    map.getSource('shadow').updateImage({ url: shadowUrl(), coordinates: meta.shadow_bounds });
+    map.setTerrain({ source: state.surface ? 'dsm' : 'dtm', exaggeration: +$('exag').value });
+  };
+  map.on('load', apply);
+  tb.onclick = e => { if (e.target.dataset.v) { state.time = e.target.dataset.v; apply(); } };
+  $('base').onclick = e => { if (e.target.dataset.v) { state.base = e.target.dataset.v; apply(); } };
+  $('surface').onchange = e => { state.surface = e.target.checked; apply(); };
+  $('shadow').onchange = e => { state.shadow = e.target.checked; apply(); };
+  $('exag').oninput = e => { $('exagv').textContent = `${(+e.target.value).toFixed(1)}×`; map.setTerrain({ source: state.surface ? 'dsm' : 'dtm', exaggeration: +e.target.value }); };
+  $('hide').onclick = () => { $('panel').style.display = 'none'; $('show').style.display = 'block'; };
+  $('show').onclick = () => { $('panel').style.display = ''; $('show').style.display = 'none'; };
+  window.__map = map;
+})();
+</script>
+</body>
+</html>

@@ -26,6 +26,9 @@ const DICT = {
     near: 'Nah', far: 'Fern', loadingTiles: '{l}: lade 2-m-Kacheln {n}/{t}…', loadingDem: 'Lade Höhendaten…',
     loadingDemFar: 'Lade Höhendaten Fernbereich…', areaInfo: '{w}×{h} Pixel à {px} m · Gelände {lod}',
     farInfo: ' · Fernbereich {km} km à {px} m', day: 'Tag', hoursPct: 'Sonnenstunden {p} %', hoursFor: 'Sonnenstunden für {d}',
+    orbitLeft: 'Nach links drehen', orbitRight: 'Nach rechts drehen', tiltUp: 'Zum Horizont kippen', tiltDown: 'Mehr von oben ansehen',
+    hint3dTouch: '3D: mit zwei Fingern drehen und kippen – oder die Knöpfe rechts (gedrückt halten).',
+    hint3dDesk: '3D: Trackpad mit zwei Fingern drehen · ⇧ + scrollen kippt · ⌥ + scrollen dreht · oder die Knöpfe rechts (gedrückt halten).',
     noGeo: 'Standort nicht verfügbar', locating: 'Suche Standort…', geoErr: 'Standort: {m}',
   },
   en: {
@@ -54,6 +57,9 @@ const DICT = {
     near: 'Near', far: 'Far', loadingTiles: '{l}: loading 2 m tiles {n}/{t}…', loadingDem: 'Loading elevation data…',
     loadingDemFar: 'Loading elevation data (far range)…', areaInfo: '{w}×{h} pixels of {px} m · terrain {lod}',
     farInfo: ' · far range {km} km at {px} m', day: 'Day', hoursPct: 'Sun hours {p} %', hoursFor: 'Sun hours for {d}',
+    orbitLeft: 'Rotate left', orbitRight: 'Rotate right', tiltUp: 'Tilt toward horizon', tiltDown: 'View more from above',
+    hint3dTouch: '3D: rotate and tilt with two fingers – or use the buttons on the right (press and hold).',
+    hint3dDesk: '3D: rotate with two fingers on the trackpad · ⇧ + scroll tilts · ⌥ + scroll rotates · or use the buttons on the right (press and hold).',
     noGeo: 'Location not available', locating: 'Finding location…', geoErr: 'Location: {m}',
   },
 };

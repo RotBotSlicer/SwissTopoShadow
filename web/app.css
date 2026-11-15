@@ -70,3 +70,6 @@ body.has-profile #sbtn { top:calc(var(--ph, 0px) + 16px); }
 #preset { border:0; background:none; font-size:1.15rem; line-height:1; padding:0 6px; }
 .lang button { border:0; background:none; padding:0 3px; font-size:inherit; color:var(--mut); }
 .lang button[aria-checked="true"] { color:var(--fg); font-weight:700; text-decoration:underline; }
+#toast { position:fixed; z-index:1002; left:50%; transform:translateX(-50%); top:calc(60px + env(safe-area-inset-top)); max-width:min(560px, 86vw);
+  background:rgba(30,36,32,.88); color:#fff; font-size:.85rem; padding:8px 12px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+.orbit-ctrl button svg { display:block; margin:auto; }

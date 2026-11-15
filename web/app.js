@@ -50,6 +50,12 @@ let TZ = 'Europe/Zurich';
 const setTZ = (lat, lon) => { TZ = isCH() ? 'Europe/Zurich' : (tzlookup(lat, lon) || 'UTC'); };
 const fmtTime = u => new Date(u * 1000).toLocaleTimeString(LOCALE(), { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 const status = t => { $('status').textContent = t; };
+/** Kurzer Hinweis über der Karte (verschwindet nach einigen Sekunden oder beim Antippen). */
+function toast(text, ms = 7000) {
+  const el = $('toast'); el.textContent = text; el.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, ms);
+  el.onclick = () => { el.hidden = true; };
+}
 
 // ------------------------------------------------------------ Karte
 let base = store.get('base') === 'air' ? 'air' : 'map';
@@ -62,6 +68,7 @@ const mv = new MapView('map', {
     world: async (z, x, y) => encodeTerrarium(await heightsWorld(z, x, y)),
   },
 });
+applyStatic(); // Texte der Kartenknöpfe (3D-Steuerung)
 mv.onMoveEnd(() => { const c = mv.center(); store.set('view', { lat: c.lat, lon: c.lon, z: mv.zoom() }); updateAreaButton(); });
 
 function applyRegion() {
@@ -553,6 +560,7 @@ $('base-air').onclick = () => { base = 'air'; store.set('base', base); applyRegi
 $('t3d').onclick = () => {
   const on = $('t3d').getAttribute('aria-pressed') !== 'true';
   $('t3d').setAttribute('aria-pressed', String(on)); mv.set3D(on); updateAreaButton();
+  if (on) toast(t(matchMedia('(pointer: fine)').matches ? 'hint3dDesk' : 'hint3dTouch'));
 };
 $('reg-world').onclick = () => setRegion('world');
 $('surface').onchange = () => {

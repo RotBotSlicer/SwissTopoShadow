@@ -15,6 +15,51 @@ async function toPng(rgba) {
   return blob.arrayBuffer();
 }
 
+/** 3D-Steuerung: drehen (links/rechts) und kippen (steiler/flacher). Kurz tippen = ein Schritt, halten = fortlaufend. */
+class OrbitControl {
+  onAdd(map) {
+    this.map = map;
+    const el = this.el = document.createElement('div');
+    el.className = 'maplibregl-ctrl maplibregl-ctrl-group orbit-ctrl';
+    const svg = d => `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const btn = (key, icon, rate) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.dataset.i18nAria = key; b.dataset.i18nTitle = key; b.innerHTML = svg(icon);
+      b.addEventListener('pointerdown', ev => { ev.preventDefault(); b.setPointerCapture(ev.pointerId); this._start(rate); });
+      for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(t, () => this._stop());
+      b.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); this._step(rate); } });
+      el.append(b);
+    };
+    btn('orbitLeft', 'M8 6 4 10l4 4M4 10h10a6 6 0 0 1 0 12', { b: -1 });
+    btn('orbitRight', 'M16 6l4 4-4 4M20 10H10a6 6 0 0 0 0 12', { b: 1 });
+    btn('tiltUp', 'M6 15l6-6 6 6', { p: 1 });
+    btn('tiltDown', 'M6 9l6 6 6-6', { p: -1 });
+    el.hidden = true;
+    return el;
+  }
+  onRemove() { this.el.remove(); }
+  _step(r) { // ein Schritt: 15° drehen bzw. 10° kippen
+    const m = this.map;
+    m.easeTo({ bearing: m.getBearing() + 15 * (r.b ?? 0), pitch: m.getPitch() + 10 * (r.p ?? 0), duration: 250 });
+  }
+  _start(r) {
+    this._stop();
+    this._step(r);
+    const t0 = performance.now() + 300; // nach 300 ms gedrückt halten: fortlaufend (60°/s drehen, 25°/s kippen)
+    let last = t0;
+    const loop = now => {
+      if (now > t0) {
+        const dt = (now - last) / 1000, m = this.map;
+        m.jumpTo({ bearing: m.getBearing() + 60 * dt * (r.b ?? 0), pitch: m.getPitch() + 25 * dt * (r.p ?? 0) });
+        last = now;
+      }
+      this._raf = requestAnimationFrame(loop);
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  _stop() { cancelAnimationFrame(this._raf); this._raf = null; }
+}
+
 export class MapView {
   /** dem: { ch(z,x,y), world(z,x,y) } -> Promise<Uint8ClampedArray> (Terrarium-RGBA) für die 3D-Ansicht */
   constructor(container, { lat, lon, zoom, dem }) {
@@ -48,6 +93,9 @@ export class MapView {
     });
     this.map.touchZoomRotate.disableRotation();
     this.map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), 'top-right');
+    this.orbit = new OrbitControl();
+    this.map.addControl(this.orbit, 'top-right');
+    this._trackpad();
     this.ready = new Promise(r => this.map.on('load', r));
     // 3D: Kameramitte auf das Gelände setzen und die Kamera nie im Berg stehen lassen
     this.map.on('moveend', () => this._fixCamera());
@@ -127,8 +175,34 @@ export class MapView {
     for (const h of [m.dragRotate, m.touchPitch]) on ? h.enable() : h.disable();
     on ? m.touchZoomRotate.enableRotation() : m.touchZoomRotate.disableRotation();
     m.setMaxPitch(on ? 80 : 0);
+    this.orbit.el.hidden = !on;
     this._applyTerrain();
     m.easeTo(on ? { pitch: 60, duration: 800 } : { pitch: 0, bearing: 0, duration: 500 });
+  }
+  /** Trackpad am Mac (Safari): zwei Finger drehen = Karte drehen, Auseinanderziehen = zoomen (Safari meldet das als
+   *  „gesture“-Ereignisse, die MapLibre nicht auswertet). In 3D: Umschalt + scrollen = kippen, Option + scrollen = drehen. */
+  _trackpad() {
+    const el = this.map.getContainer(), m = this.map;
+    let g = null, ctrlWheel = 0;
+    el.addEventListener('gesturestart', e => { e.preventDefault(); g = { b: m.getBearing(), z: m.getZoom() }; });
+    el.addEventListener('gesturechange', e => {
+      e.preventDefault();
+      if (!g) return;
+      const o = {};
+      if (this.is3D && Number.isFinite(e.rotation)) o.bearing = g.b - e.rotation;
+      // Zoomen nur, wenn der Browser es nicht schon als Ctrl+Mausrad schickt (Chrome, Firefox, neuere Safari)
+      if (Number.isFinite(e.scale) && e.scale > 0 && performance.now() - ctrlWheel > 300) o.zoom = g.z + Math.log2(e.scale);
+      if (Object.keys(o).length) m.jumpTo(o);
+    });
+    el.addEventListener('gestureend', e => { e.preventDefault(); g = null; });
+    el.addEventListener('wheel', e => {
+      if (e.ctrlKey) { ctrlWheel = performance.now(); return; }
+      if (!this.is3D || !(e.shiftKey || e.altKey)) return;
+      e.preventDefault(); e.stopPropagation();
+      const d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX; // macOS macht aus Umschalt+vertikal horizontal
+      if (e.shiftKey) m.jumpTo({ pitch: Math.min(80, Math.max(0, m.getPitch() - d * 0.15)) });
+      else m.jumpTo({ bearing: m.getBearing() + d * 0.25 });
+    }, { capture: true, passive: false });
   }
   _fixCamera() {
     const m = this.map, t = m.transform;

@@ -10,6 +10,8 @@ Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhen
   Auf der Südhalbkugel ist Norden in der Mitte. Zoomen mit zwei Fingern (Mausrad), verschieben mit einem Finger,
   Doppeltipp oder ⟲ zeigt wieder den ganzen Horizont. Mit „Wald und Gebäude“ ist der Horizont nach Ursache eingefärbt:
   Gelände grau, Wald/Bäume grün, Gebäude rot (Dachflächen-Layer des BFE auf Basis swissBUILDINGS3D, 2.5 m).
+- **3D-Steuerung:** Knöpfe rechts zum Drehen und Kippen (tippen = Schritt, halten = fortlaufend); Trackpad am Mac:
+  zwei Finger drehen, ⇧ + scrollen kippt, ⌥ + scrollen dreht; Handy: zwei Finger drehen und kippen.
 - **3D:** Schatten über die ganze schräge Ansicht – vorne fein, dahinter ein grober Fernbereich bis zum Horizont (±30 km).
 - **Schatten für Ausschnitt:** Schatten über der Landeskarte mit Zeitschieber und Animation,
   oder Sonnenstunden des Tages als Farbkarte. Gerechnet auf der Grafikkarte (WebGL2).

@@ -77,7 +77,7 @@ function applyRegion() {
   mv.setBase(isCH() ? base : 'map');
   $('base-map').setAttribute('aria-checked', String(base === 'map')); $('base-air').setAttribute('aria-checked', String(base === 'air'));
   $('reg-ch').setAttribute('aria-checked', String(isCH())); $('reg-world').setAttribute('aria-checked', String(!isCH()));
-  $('surface-row').hidden = !isCH(); $('world-note').hidden = isCH();
+  $('surface-row').hidden = !isCH(); $('trails-row').hidden = !isCH(); $('world-note').hidden = isCH();
   $('credits').innerHTML = isCH()
     ? `${t('creditsCH')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`
     : `${t('creditsWorld')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`;
@@ -552,6 +552,9 @@ $('area').onclick = computeArea;
 $('time').oninput = () => { if ($('mode').value !== 'shadow') $('mode').value = 'shadow'; draw(); };
 $('mode').onchange = draw;
 $('surface').checked = store.get('surface') ?? true;
+$('trails').checked = store.get('trails') ?? true;
+mv.setTrails($('trails').checked);
+$('trails').onchange = () => { store.set('trails', $('trails').checked); mv.setTrails($('trails').checked); };
 $('ptoggle').setAttribute('aria-pressed', String(store.get('profile') ?? true));
 $('ptoggle').onclick = () => setProfile(!profileOn());
 $('pclose').onclick = () => setProfile(false);

@@ -161,10 +161,12 @@ export class MapView {
   // ---------------------------------------------------------------- Ebenen
   setRegion(region) { this.region = region; this._applyLayers(); if (this.is3D) this._applyTerrain(); }
   setBase(base) { this.base = base; this._applyLayers(); }
+  /** Wanderwege (swisstopo) ein-/ausblenden */
+  setTrails(on) { this.trails = on; this._applyLayers(); }
   async _applyLayers() {
     await this.ready;
     const ch = this.region === 'ch', vis = (id, on) => this.map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
-    vis('lk', ch && this.base === 'map'); vis('luft', ch && this.base === 'air'); vis('wander', ch); vis('otm', !ch);
+    vis('lk', ch && this.base === 'map'); vis('luft', ch && this.base === 'air'); vis('wander', ch && this.trails !== false); vis('otm', !ch);
   }
 
   // ---------------------------------------------------------------- 3D

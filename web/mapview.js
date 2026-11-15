@@ -249,8 +249,30 @@ export class MapView {
     this.overlays.set(id, this.map.getSource(sid));
     this.overlayChanged(id);
   }
+  /** Umriss der gerechneten Bereiche (dünne gestrichelte Linie, liegt in 3D auf dem Gelände). */
+  async setOutline(boundsList) {
+    await this.ready;
+    const ring = b => { // dicht abgetastet, damit die Linie dem Gelände folgt
+      const n = 64, pts = [], L = (a, c, t) => a + (c - a) * t;
+      for (let i = 0; i < n; i++) pts.push([L(b.west, b.east, i / n), b.north]);
+      for (let i = 0; i < n; i++) pts.push([b.east, L(b.north, b.south, i / n)]);
+      for (let i = 0; i < n; i++) pts.push([L(b.east, b.west, i / n), b.south]);
+      for (let i = 0; i <= n; i++) pts.push([b.west, L(b.south, b.north, i / n)]);
+      return pts;
+    };
+    const data = { type: 'FeatureCollection', features: boundsList.map(b => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: ring(b) } })) };
+    const src = this.map.getSource('outline');
+    if (src) src.setData(data);
+    else {
+      this.map.addSource('outline', { type: 'geojson', data });
+      this.map.addLayer({ id: 'outline', type: 'line', source: 'outline', paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-opacity': 0.8, 'line-dasharray': [3, 2] } });
+    }
+    if (this.map.getLayer('outline')) this.map.moveLayer('outline'); // zuoberst
+  }
+
   /** Ebene id entfernen (ohne id: alle). */
   removeOverlay(id) {
+    if (!id && this.map.getSource('outline')) this.map.getSource('outline').setData({ type: 'FeatureCollection', features: [] });
     for (const k of id ? [id] : [...(this.overlays?.keys() ?? [])]) {
       const sid = `shadow-${k}`;
       if (this.map.getLayer(sid)) this.map.removeLayer(sid);
@@ -259,16 +281,22 @@ export class MapView {
     }
   }
   /** Nach jedem Neuzeichnen aufrufen (ohne id: alle Ebenen): Inhalt in die Karte übernehmen.
-   *  play/pause lädt das Canvas neu in die Textur. In 3D zeichnet MapLibre das Gelände über einen
-   *  Zwischenspeicher (render to texture), der davon nichts merkt – setCoordinates meldet die Quelle als
-   *  geändert, damit dieser Zwischenspeicher neu gezeichnet wird. */
+   *  play/pause lädt das Canvas neu in die Textur. In 3D zeichnet MapLibre das Gelände über einen Zwischenspeicher
+   *  (render to texture) pro Geländekachel. Bei Canvas-Quellen leert MapLibre diesen nur für die Kachel der Quelle,
+   *  die gerade ein Ereignis meldet – bei mehreren Ebenen blieben Teile alt. Deshalb hier den ganzen Zwischenspeicher
+   *  leeren (wie MapLibre es selbst bei Bild-Quellen tut). */
   overlayChanged(id) {
     for (const [k, s] of this.overlays ?? []) {
       if (id && k !== id) continue;
       s.play();
-      if (this.is3D) s.setCoordinates(s.coordinates);
       clearTimeout(s._pauseT);
       s._pauseT = setTimeout(() => s.pause(), 250);
+    }
+    if (this.is3D) {
+      const tm = this.map.terrain?.tileManager;
+      if (typeof tm?.freeRtt === 'function') tm.freeRtt();
+      else for (const [, s] of this.overlays ?? []) s.setCoordinates(s.coordinates); // Rückfall (ältere MapLibre)
+      this.map.triggerRepaint();
     }
   }
 }

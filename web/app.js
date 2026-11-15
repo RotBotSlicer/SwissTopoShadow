@@ -404,8 +404,19 @@ function updateAreaButton() {
   const big = Math.max(s.widthM, s.heightM) > MAX_AREA_M;
   const px = Math.max(s.widthM / s.w, s.heightM / s.h);
   $('area').disabled = big;
+  const stale = !big && area && !viewCovered();
   $('area').textContent = big ? t('zoomCloser')
-    : t('shadowBtn', { lod: lodName(areaLod(px)) }) + (wantFar(b) ? t('farPart') : '');
+    : (stale ? t('recompute') + ' · ' : '') + t('shadowBtn', { lod: lodName(areaLod(px)) }) + (wantFar(b) ? t('farPart') : '');
+  $('area').classList.toggle('stale', !!stale);
+}
+/** Deckt der gerechnete Schatten die aktuelle Ansicht ab? (Stichproben des sichtbaren Bodens) */
+function viewCovered() {
+  if (!area) return false;
+  const v = mv.viewBounds(), pts = mv.is3D && mv.map.getPitch() >= 1 ? mv._footprint(0.15, 1, R_MAX)
+    : [0, 0.5, 1].flatMap(i => [0, 0.5, 1].map(j => ({ lat: v.south + (v.north - v.south) * i, lng: v.west + (v.east - v.west) * j })));
+  if (!pts.length) return true;
+  const inside = p => area.layers.some(({ b }) => p.lat >= b.south - 1e-4 && p.lat <= b.north + 1e-4 && p.lng >= b.west - 1e-4 && p.lng <= b.east + 1e-4);
+  return pts.filter(inside).length >= 0.9 * pts.length;
 }
 /** Fernbereich nur, wenn die 3D-Ansicht deutlich mehr Boden zeigt als der feine Bereich. */
 function wantFar(near) {
@@ -456,6 +467,7 @@ async function computeArea() {
     hours = null;
     mv.removeOverlay();
     for (const L of layers) await mv.setOverlay(L.id, L.renderer.canvas, L.b);
+    await mv.setOutline(layers.map(L => L.b));
     prepareDay();
     const g = near.grid, fr = layers.length > 1 ? layers[0] : null;
     area.statusText = () => t('areaInfo', { w: g.w, h: g.h, px: g.pixelSize.toFixed(1), lod: lodName(near.lod) })

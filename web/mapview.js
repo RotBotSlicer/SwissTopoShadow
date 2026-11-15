@@ -143,12 +143,16 @@ export class MapView {
     if (this.map.getSource('shadow')) this.map.removeSource('shadow');
     this.overlay = null;
   }
-  /** Nach jedem Neuzeichnen des Canvas aufrufen: Inhalt in die Karte übernehmen. */
+  /** Nach jedem Neuzeichnen des Canvas aufrufen: Inhalt in die Karte übernehmen.
+   *  play/pause lädt das Canvas neu in die Textur. In 3D zeichnet MapLibre das Gelände über einen
+   *  Zwischenspeicher (render to texture), der davon nichts merkt – setCoordinates meldet die Quelle als
+   *  geändert, damit dieser Zwischenspeicher neu gezeichnet wird. */
   overlayChanged() {
     const s = this.overlay;
     if (!s) return;
     s.play();
-    cancelAnimationFrame(this._pause);
-    this._pause = requestAnimationFrame(() => { this._pause = requestAnimationFrame(() => s.pause()); });
+    if (this.is3D) s.setCoordinates(s.coordinates);
+    clearTimeout(this._pause);
+    this._pause = setTimeout(() => { if (this.overlay === s) s.pause(); }, 250);
   }
 }

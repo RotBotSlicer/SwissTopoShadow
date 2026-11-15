@@ -1,3 +1,4 @@
+import { Terrain } from './raster.js';
 // Horizont, Schatten, Sonnenzeiten – Port von schatten/horizon.py (CPU-Referenz).
 // Alle Azimute sind Gitterazimute (LV95 oder lokale TM); Sonnenstand über sunPositionGrid(…, proj).
 import { sunPositionGrid } from './sun.js';
@@ -30,6 +31,35 @@ export function pointHorizon(terrain, E, N, azDeg, { eye = 1.7, rMax = 15000, gr
     }
     return Math.atan(best) / DEG;
   });
+}
+
+/**
+ * Horizont mit Aufschlüsselung: h (mit Oberfläche, wie pointHorizon), bare (nur Gelände ohne Wald/Gebäude),
+ * hitE/hitN (Ort, der den Horizont h bestimmt) und hitObj (Höhe der Oberfläche dort über Boden [m]).
+ * Ohne Oberflächenstufen (groundLevel 0) ist bare = h und hitObj = 0.
+ */
+export function pointHorizonDetail(terrain, E, N, azDeg, { eye = 1.7, rMax = 15000, growth = 0 } = {}) {
+  const z0 = terrain.ground.sample(E, N) + eye;
+  const rs = rayDistances(terrain, rMax, growth);
+  const n = azDeg.length, h = new Float64Array(n), bare = new Float64Array(n);
+  const hitE = new Float64Array(n), hitN = new Float64Array(n), hitObj = new Float64Array(n);
+  const gl = terrain.groundLevel, ground = terrain.ground;
+  const bareT = gl > 0 ? new Terrain(terrain.levels.slice(gl)) : null;
+  for (let k = 0; k < n; k++) {
+    const s = Math.sin(azDeg[k] * DEG), c = Math.cos(azDeg[k] * DEG);
+    let best = -Infinity, bestB = -Infinity, rb = rs[0];
+    for (const r of rs) {
+      const e = E + s * r, nn = N + c * r, d = drop(r);
+      const t = (terrain.sample(e, nn, r) - z0 - d) / r;
+      if (t > best) { best = t; rb = r; }
+      if (bareT) { const tb = (bareT.sample(e, nn, r) - z0 - d) / r; if (tb > bestB) bestB = tb; }
+    }
+    h[k] = Math.atan(best) / DEG;
+    bare[k] = bareT ? Math.min(h[k], Math.atan(bestB) / DEG) : h[k];
+    hitE[k] = E + s * rb; hitN[k] = N + c * rb;
+    hitObj[k] = bareT && terrain.levelIndex(rb) < gl ? terrain.sample(hitE[k], hitN[k], rb) - ground.sample(hitE[k], hitN[k]) : 0;
+  }
+  return { h, bare, hitE, hitN, hitObj };
 }
 
 /** Gitter-Pixelzentren: grid = {x0, y0, res, w, h} (x0,y0 = obere linke Ecke). */

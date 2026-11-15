@@ -2,7 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Raster, Terrain } from '../src/raster.js';
-import { pointHorizon } from '../src/horizon.js';
+import { pointHorizon, pointHorizonDetail } from '../src/horizon.js';
+import { BuildingMask } from '../src/buildings.js';
 import { withSurface, LOD_DEFAULT, LOD_10M } from '../src/loaders.js';
 
 const E0 = 2600000, N0 = 1200000;
@@ -43,4 +44,26 @@ test('withSurface: nur mit 2-m-Gelände, Boden markiert', () => {
   assert.ok(l[1].ground && !l[0].ground);
   assert.equal(withSurface(LOD_DEFAULT, { point: true })[0].res, 1);
   assert.equal(withSurface(LOD_10M), LOD_10M);
+});
+
+test('pointHorizonDetail: h wie pointHorizon, bare ohne Wald, Treffpunkt am Waldrand', () => {
+  // Waldrand 100 m südlich (25 m hoch), dahinter Hügel 40 m hoch in 2 km (nur im 10-m-Gelände)
+  const t = new Terrain([
+    { raster: ras(2, (x, y) => (y < -100 ? 25 : 0)), until: 1000 },
+    { raster: ras(2, () => 0), until: 1000 },
+    { raster: ras(10, (x, y) => (y < -2000 ? 40 : 0), 3000), until: Infinity },
+  ], { groundLevel: 1 });
+  const az = [0, 90, 180, 270];
+  const d = pointHorizonDetail(t, E0, N0, az, { eye: 1.7, rMax: 2800 });
+  assert.deepEqual([...d.h], [...pointHorizon(t, E0, N0, az, { eye: 1.7, rMax: 2800 })]);
+  assert.ok(d.h[2] > 12 && d.bare[2] < 2 && d.bare[2] > 0.5, `${d.h[2]} ${d.bare[2]}`); // Wald verdeckt, Gelände: Hügel ~1°
+  assert.ok(Math.abs(d.hitN[2] - (N0 - 101)) < 3 && Math.abs(d.hitObj[2] - 25) < 0.1, `${d.hitN[2]} ${d.hitObj[2]}`);
+  assert.equal(d.hitObj[0], 0);
+});
+
+test('BuildingMask: Kachelindex und Toleranz', () => {
+  const m = new Uint8Array(256 * 256); m[10 * 256 + 20] = 1; // Pixel (20, 10) in Kachel 72/80
+  const b = new BuildingMask(new Map([['72/80', m]]));
+  const E = 2420000 + 72 * 640 + 20.5 * 2.5, N = 1350000 - 80 * 640 - 10.5 * 2.5;
+  assert.ok(b.at(E, N)); assert.ok(!b.at(E + 5, N)); assert.ok(b.near(E + 2, N)); assert.ok(!b.at(E + 100000, N));
 });

@@ -3,7 +3,8 @@
 import { Pyramid } from './lib/tiles.js';
 import { loadTerrainLod, lodForPixelSize, withSurface, LOD_DEFAULT } from './lib/loaders.js';
 import { loadTerrainWorld, lodWorldForPixelSize } from './lib/copernicus.js';
-import { pointHorizon, litTimeline, intervals } from './lib/horizon.js';
+import { pointHorizonDetail, litTimeline, intervals } from './lib/horizon.js';
+import { loadBuildingMask } from './lib/buildings.js';
 import { sunPosition, sunPositionGrid, sunPositionGridGrad } from './lib/sun.js';
 import { LV95, localTM } from './lib/coords.js';
 import { mercatorGrid, gridSizeFor } from './lib/area.js';
@@ -128,9 +129,19 @@ async function showPoint(lat, lon) {
       }
     }
     const az = Array.from({ length: 1440 }, (_, i) => i * 0.25);
-    const h = pointHorizon(terrain, E, N, az, { eye: 1.7, rMax: R_MAX });
+    const det = pointHorizonDetail(terrain, E, N, az, { eye: 1.7, rMax: R_MAX });
+    const h = det.h;
+    // Was bestimmt den Horizont? 0 Gelände, 1 Wald/Bäume, 2 Gebäude (nur mit Oberflächenmodell)
+    const cls = new Uint8Array(az.length);
+    if (terrain.groundLevel > 0) {
+      const reach = terrain.levels[terrain.groundLevel - 1].until + 50;
+      const bm = await loadBuildingMask([E - reach, N - reach, E + reach, N + reach]).catch(() => null);
+      for (let k = 0; k < az.length; k++) {
+        if (det.hitObj[k] > 2 && h[k] - det.bare[k] > 0.05) cls[k] = bm?.near(det.hitE[k], det.hitN[k]) ? 2 : 1;
+      }
+    }
     const z = terrain.ground.sample(E, N), top = terrain.fine.sample(E, N);
-    pointTerrain = { E, N, lat, lon, proj, az, h, z, canopy: terrain.groundLevel > 0 ? top - z : null };
+    pointTerrain = { E, N, lat, lon, proj, az, h, bare: det.bare, cls, z, canopy: terrain.groundLevel > 0 ? top - z : null };
     renderPoint();
     status('');
   } catch (e) { console.error(e); status('Fehler: ' + e.message); }
@@ -153,7 +164,7 @@ function renderPoint() {
     : cp > 3 ? `mit Wald und Gebäude · der Punkt liegt unter Bäumen oder an einem Gebäude (Oberfläche ${Math.round(cp)} m über Boden)`
       : 'mit Wald und Gebäude';
   $('psum').textContent = `${$('summary').textContent} · ${intervals(times, lit).map(([a, b]) => `${fmtTime(a)}–${fmtTime(b)}`).join(', ') || '–'}`;
-  drawChart(az, h, times, E, N, lit, proj);
+  drawChart(az, h, times, E, N, lit, proj, pointTerrain);
 }
 
 // ------------------------------------------------------------ Profil (Horizont + Sonnenbahnen)
@@ -191,7 +202,7 @@ function extremeDays(year, E, N, proj) {
 }
 
 let chartGeom = null;
-function drawChart(az, h, times, E, N, lit, proj) {
+function drawChart(az, h, times, E, N, lit, proj, pt = {}) {
   const W = 640, H = 230, L0 = 30, B = 22, T = 6, R = 6;
   const lat = proj.toLatLon(E, N).lat;
   const center = lat >= 0 ? 180 : 0; // Mitte der Grafik: Süden (Nordhalbkugel) bzw. Norden
@@ -208,8 +219,21 @@ function drawChart(az, h, times, E, N, lit, proj) {
   const x = r => L0 + (r - r0) / (r1 - r0) * (W - L0 - R), y = e => H - B - Math.max(0, e) / maxEl * (H - B - T);
   chartGeom = { x, y, rel, E, N, proj };
   // Horizont (nach relativem Azimut sortiert)
-  const hz = az.map((a, i) => [rel(a), h[i]]).filter(([r]) => r >= r0 && r <= r1).sort((p, q) => p[0] - q[0]);
-  let d = `M${x(r0)},${y(0)}`; hz.forEach(([r, v]) => { d += `L${x(r).toFixed(1)},${y(v).toFixed(1)}`; }); d += `L${x(r1)},${y(0)}Z`;
+  // Grau: Gelände allein; darüber farbig, was Wald/Bäume (grün) bzw. Gebäude (rot) zusätzlich verdecken
+  const bare = pt.bare ?? h, cls = pt.cls ?? new Uint8Array(az.length);
+  const hz = az.map((a, i) => [rel(a), h[i], bare[i], cls[i]]).filter(([r]) => r >= r0 && r <= r1).sort((p, q) => p[0] - q[0]);
+  const P = (r, v) => `${x(r).toFixed(1)},${y(v).toFixed(1)}`;
+  let d = `M${x(r0)},${y(0)}`; hz.forEach(([r, , b]) => { d += `L${P(r, b)}`; }); d += `L${x(r1)},${y(0)}Z`;
+  const objPaths = { 1: '', 2: '' }, half = 0.125;
+  for (let i = 0; i < hz.length;) {
+    const k = hz[i][3];
+    if (!k) { i++; continue; }
+    let j = i; while (j + 1 < hz.length && hz[j + 1][3] === k) j++;
+    const run = hz.slice(i, j + 1), ra = run[0][0] - half, rb = run[run.length - 1][0] + half;
+    objPaths[k] += `M${P(ra, run[0][2])}L${P(ra, run[0][1])}` + run.map(([r, v]) => `L${P(r, v)}`).join('')
+      + `L${P(rb, run[run.length - 1][1])}L${P(rb, run[run.length - 1][2])}` + [...run].reverse().map(([r, , b]) => `L${P(r, b)}`).join('') + 'Z';
+    i = j + 1;
+  }
   const line = list => { let s = '', prev = null; list.forEach(p => { if (p.el < -0.5) { prev = null; return; } const r = rel(p.az); const pt = `${x(r).toFixed(1)},${y(p.el).toFixed(1)}`; s += (prev === null || Math.abs(r - prev) > 90 ? 'M' : 'L') + pt; prev = r; }); return s; };
   let dots = '', ticks = '', axes = '';
   suns.forEach((p, i) => {
@@ -222,11 +246,15 @@ function drawChart(az, h, times, E, N, lit, proj) {
   const names = { 0: 'N', 45: 'NO', 90: 'O', 135: 'SO', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
   for (const [a, l] of Object.entries(names)) { const r = rel(+a); if (r >= r0 && r <= r1) axes += `<text x="${x(r)}" y="${H - 5}" font-size="11" text-anchor="middle" fill="#5d6a62">${l}</text>`; }
   for (let e = 0; e <= maxEl; e += 10) axes += `<line x1="${L0}" x2="${W - R}" y1="${y(e)}" y2="${y(e)}" stroke="#e6e6e0"/><text x="${L0 - 4}" y="${y(e) + 4}" font-size="10" text-anchor="end" fill="#5d6a62">${e}°</text>`;
-  $('chart').innerHTML = `${axes}<path d="${d}" fill="#8a9a78" opacity=".85"/>`
+  $('chart').innerHTML = `${axes}<path d="${d}" fill="#9b9d96" opacity=".85"/>`
+    + `<path d="${objPaths[1]}" fill="#5f9a4e" opacity=".9"/><path d="${objPaths[2]}" fill="#c8473a" opacity=".9"/>`
     + `<path d="${line(sLong)}" fill="none" stroke="#c9a227" stroke-width="1.4" stroke-dasharray="4 3"/>`
     + `<path d="${line(sShort)}" fill="none" stroke="#5a7fb0" stroke-width="1.4" stroke-dasharray="4 3"/>`
     + `<path d="${line(suns)}" fill="none" stroke="#d9822b" stroke-width="1.6"/>${dots}${ticks}<g id="nowmark"></g>`;
   const fd = day => new Date(`${day}T12:00:00Z`).toLocaleDateString('de-CH', { day: 'numeric', month: 'numeric', timeZone: 'UTC' });
+  const has = k => hz.some(p => p[3] === k);
+  $('lg-obj').innerHTML = '<span class="sw sw-ter"></span>Gelände'
+    + (has(1) ? '<span class="sw sw-tree"></span>Wald/Bäume' : '') + (has(2) ? '<span class="sw sw-bld"></span>Gebäude' : '');
   $('lg-day').textContent = fd($('date').value); $('lg-sum').textContent = `längster Tag (${fd(ex.long)})`; $('lg-win').textContent = `kürzester Tag (${fd(ex.short)})`;
   updateProfileVisibility();
 }

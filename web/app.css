@@ -49,3 +49,6 @@ body.has-profile .maplibregl-ctrl-top-right { top:calc(var(--ph, 0px) + 16px); }
 .pt-marker { width:14px; height:14px; border-radius:50%; background:#d4442e; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.4); }
 #region-info { margin:-4px 0 8px; }
 .seg button { padding:7px 9px; }
+.plegend .sw-ter, .plegend .sw-tree, .plegend .sw-bld { height:10px; border-top:0; border-radius:2px; }
+.sw-ter { background:#9b9d96; } .sw-tree { background:#5f9a4e; } .sw-bld { background:#c8473a; }
+#lg-obj { display:flex; gap:5px; align-items:center; flex-basis:100%; }

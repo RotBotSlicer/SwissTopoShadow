@@ -573,7 +573,7 @@ async function applyBuildings() {
   if (!buildings) { const { Buildings } = await import('./buildings3d.js'); buildings ??= new Buildings(mv.map); }
   try { await buildings.set(want); } catch (e) { console.error(e); status(t('error', { m: e.message })); }
 }
-$('bld').checked = store.get('buildings3d') ?? false;
+$('bld').checked = store.get('buildings3d') ?? true;
 $('bld').onchange = () => { store.set('buildings3d', $('bld').checked); applyBuildings(); };
 $('trails').checked = store.get('trails') ?? true;
 mv.setTrails($('trails').checked);

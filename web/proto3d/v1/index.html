@@ -35,7 +35,8 @@
   <div class="sub">Eigenes Gelände (swissALTI3D / swissSURFACE3D) mit Landeskarte und unserer Schattenebene. Bösbächibach, 14.11.2026.</div>
   <div class="row"><span>Karte</span><div class="seg" id="base"><button data-v="luft" class="on">Luftbild</button><button data-v="lk">Landeskarte</button></div></div>
   <div class="row"><span>Zeit</span><div class="seg" id="time"></div></div>
-  <div class="row"><label><input type="checkbox" id="surface" checked> Wald und Gebäude</label>
+  <div class="row"><label><input type="checkbox" id="surface3d"> Wald und Gebäude im 3D-Gelände</label></div>
+  <div class="row"><label><input type="checkbox" id="surface" checked> Wald und Gebäude im Schatten</label>
     <label><input type="checkbox" id="shadow" checked> Schatten</label></div>
   <div class="row"><label>Überhöhung <input type="range" id="exag" min="1" max="2" step="0.1" value="1"></label><span id="exagv">1.0×</span></div>
   <div id="sun"></div>
@@ -57,7 +58,7 @@
   const attr = '© <a href="https://www.swisstopo.admin.ch">swisstopo</a>';
   const [lon, lat] = meta.center;
   const bounds = [lon - 0.55, lat - 0.38, lon + 0.55, lat + 0.38];
-  const state = { time: meta.times[0], surface: true, shadow: true, base: 'luft' };
+  const state = { time: meta.times[0], surface: true, surface3d: false, shadow: true, base: 'luft' };
   const shadowUrl = () => `${D}/shadow_${state.surface ? 'dsm' : 'dtm'}_${state.time.replace(':', '')}.png`;
 
   const map = new maplibregl.Map({
@@ -80,7 +81,7 @@
         { id: 'wander', type: 'raster', source: 'wander', minzoom: 13, paint: { 'raster-opacity': 0.9 } },
         { id: 'shadow', type: 'raster', source: 'shadow', paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } },
       ],
-      terrain: { source: 'dsm', exaggeration: 1 },
+      terrain: { source: 'dtm', exaggeration: 1 },
       sky: { 'sky-color': '#a9c8ec', 'horizon-color': '#e8eef4', 'fog-color': '#e8eef4', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.8 },
     },
   });
@@ -99,14 +100,15 @@
     map.setLayoutProperty('luft', 'visibility', state.base === 'luft' ? 'visible' : 'none');
     map.setLayoutProperty('shadow', 'visibility', state.shadow ? 'visible' : 'none');
     map.getSource('shadow').updateImage({ url: shadowUrl(), coordinates: meta.shadow_bounds });
-    map.setTerrain({ source: state.surface ? 'dsm' : 'dtm', exaggeration: +$('exag').value });
+    map.setTerrain({ source: state.surface3d ? 'dsm' : 'dtm', exaggeration: +$('exag').value });
   };
   map.on('load', apply);
   tb.onclick = e => { if (e.target.dataset.v) { state.time = e.target.dataset.v; apply(); } };
   $('base').onclick = e => { if (e.target.dataset.v) { state.base = e.target.dataset.v; apply(); } };
   $('surface').onchange = e => { state.surface = e.target.checked; apply(); };
+  $('surface3d').onchange = e => { state.surface3d = e.target.checked; apply(); };
   $('shadow').onchange = e => { state.shadow = e.target.checked; apply(); };
-  $('exag').oninput = e => { $('exagv').textContent = `${(+e.target.value).toFixed(1)}×`; map.setTerrain({ source: state.surface ? 'dsm' : 'dtm', exaggeration: +e.target.value }); };
+  $('exag').oninput = e => { $('exagv').textContent = `${(+e.target.value).toFixed(1)}×`; map.setTerrain({ source: state.surface3d ? 'dsm' : 'dtm', exaggeration: +e.target.value }); };
   $('hide').onclick = () => { $('panel').style.display = 'none'; $('show').style.display = 'block'; };
   $('show').onclick = () => { $('panel').style.display = ''; $('show').style.display = 'none'; };
   window.__map = map;

@@ -24,6 +24,15 @@
     <span class="sw sw-sum"></span><span id="lg-sum">längster Tag</span><span class="sw sw-win"></span><span id="lg-win">kürzester Tag</span><span id="lg-obj"></span></div>
 </div>
 
+<!-- Ortssuche -->
+<button id="sbtn" aria-label="Ort suchen"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+<div id="search" hidden>
+  <div class="srow"><input id="sq" type="search" placeholder="Ort, Berg, Hütte, Adresse …" autocomplete="off" autocapitalize="off" enterkeyhint="search" aria-label="Ort suchen">
+    <button id="sclose" aria-label="Suche schliessen">×</button></div>
+  <ul id="sres" role="listbox"></ul>
+  <div id="sinfo" class="small mut"></div>
+</div>
+
 <div id="sheet">
   <div class="grip" id="grip"></div>
   <div id="timebox" hidden>

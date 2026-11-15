@@ -5,6 +5,7 @@ import { loadTerrainLod, lodForPixelSize, withSurface, LOD_DEFAULT } from './lib
 import { loadTerrainWorld, lodWorldForPixelSize } from './lib/copernicus.js';
 import { pointHorizonDetail, litTimeline, intervals } from './lib/horizon.js';
 import { loadBuildingMask } from './lib/buildings.js';
+import { searchPlaces } from './lib/search.js';
 import { sunPosition, sunPositionGrid, sunPositionGridGrad } from './lib/sun.js';
 import { LV95, localTM } from './lib/coords.js';
 import { mercatorGrid, gridSizeFor } from './lib/area.js';
@@ -477,4 +478,50 @@ $('grip').onclick = () => $('sheet').classList.toggle('collapsed');
 
 applyRegion();
 // Für Tests: Zustand von aussen lesbar
+// ------------------------------------------------------------ Ortssuche
+{
+  const box = $('search'), q = $('sq'), list = $('sres'), info = $('sinfo');
+  let results = [], ctrl = null, timer = null;
+  const open = () => { box.hidden = false; q.focus(); q.select(); };
+  const close = () => { box.hidden = true; ctrl?.abort(); clearTimeout(timer); };
+  const render = () => {
+    list.replaceChildren(...results.map((r, i) => {
+      const li = document.createElement('li'), n = document.createElement('div'), d = document.createElement('div');
+      li.setAttribute('role', 'option'); if (i === 0) li.className = 'sel';
+      n.className = 'sn'; n.textContent = r.name;
+      d.className = 'sd'; d.textContent = [r.kind, r.detail].filter(Boolean).join(' · ');
+      li.append(n, d); li.onclick = () => choose(r);
+      return li;
+    }));
+  };
+  async function run() {
+    ctrl?.abort(); ctrl = new AbortController();
+    const text = q.value;
+    if (text.trim().length < 2) { results = []; render(); info.textContent = ''; return; }
+    info.textContent = 'Suche …';
+    try {
+      const c = mv.center();
+      results = await searchPlaces(text, { region, near: { lat: c.lat, lon: c.lon }, signal: ctrl.signal });
+      if (text !== q.value) return;
+      render();
+      info.textContent = results.length ? '' : 'Nichts gefunden';
+    } catch (e) {
+      if (e.name !== 'AbortError') { info.textContent = 'Suche nicht erreichbar'; console.error(e); }
+    }
+  }
+  function choose(r) {
+    close();
+    if (isCH() && !r.ch) { pointTerrain = null; setRegion('world'); } // Ort ausserhalb: auf weltweit wechseln
+    mv.setView(r.lat, r.lon, r.zoom);
+    showPoint(r.lat, r.lon);
+  }
+  $('sbtn').onclick = open;
+  $('sclose').onclick = close;
+  q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 300); });
+  q.addEventListener('keydown', e => {
+    if (e.key === 'Escape') close();
+    if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); run().then(() => { if (results[0] && !box.hidden) choose(results[0]); }); }
+  });
+}
+
 window.__app = { mv, setView: (lat, lon, z) => mv.setView(lat, lon, z), get area() { return area; }, get suns() { return suns; }, get point() { return pointTerrain; }, showPoint, computeArea, setRegion };

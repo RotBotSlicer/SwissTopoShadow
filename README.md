@@ -2,6 +2,8 @@
 
 Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhenmodellen von swisstopo.
 
+- **Suche (Lupe oben links):** Orte, Berge, Hütten und Adressen. Schweiz über die Suche von geo.admin.ch (swissNAMES3D),
+  sonst weltweit über Photon (OpenStreetMap); ein Treffer ausserhalb der Schweiz schaltet auf „Weltweit“.
 - **Ort antippen:** Sonnenzeiten am Punkt. Profil oben über der Karte (Schalter „Profil“): Horizont, Sonnenbahn des
   gewählten Tages sowie des längsten und kürzesten Tages; beim Zeitschieber zeigt ein Kreis den aktuellen Sonnenstand.
   Auf der Südhalbkugel ist Norden in der Mitte. Mit „Wald und Gebäude“ ist der Horizont nach Ursache eingefärbt:

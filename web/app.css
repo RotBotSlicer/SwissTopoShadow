@@ -52,3 +52,18 @@ body.has-profile .maplibregl-ctrl-top-right { top:calc(var(--ph, 0px) + 16px); }
 .plegend .sw-ter, .plegend .sw-tree, .plegend .sw-bld { height:10px; border-top:0; border-radius:2px; }
 .sw-ter { background:#9b9d96; } .sw-tree { background:#5f9a4e; } .sw-bld { background:#c8473a; }
 #lg-obj { display:flex; gap:5px; align-items:center; flex-basis:100%; }
+
+/* Ortssuche */
+#sbtn { position:fixed; z-index:1000; left:10px; top:calc(10px + env(safe-area-inset-top)); width:40px; height:40px; padding:0;
+  display:flex; align-items:center; justify-content:center; border-radius:8px; background:#fff; border:0; box-shadow:0 0 0 2px rgba(0,0,0,.1); }
+body.has-profile #sbtn { top:calc(var(--ph, 0px) + 16px); }
+#search { position:fixed; z-index:1003; left:8px; right:8px; top:calc(8px + env(safe-area-inset-top)); max-width:720px; margin:0 auto;
+  background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.2); padding:6px; }
+.srow { display:flex; gap:6px; }
+#sq { flex:1; min-width:0; font-size:16px; padding:9px 10px; border:1px solid var(--line); border-radius:8px; }
+#sclose { border:0; background:none; font-size:1.5rem; line-height:1; padding:0 8px; }
+#sres { list-style:none; margin:4px 0 0; padding:0; max-height:50vh; overflow-y:auto; }
+#sres li { padding:8px 8px; border-radius:8px; cursor:pointer; }
+#sres li:hover, #sres li.sel { background:#f0efe9; }
+#sres .sn { font-weight:600; } #sres .sd { font-size:.8rem; color:var(--mut); }
+#sinfo:empty { display:none; } #sinfo { padding:4px 8px; }

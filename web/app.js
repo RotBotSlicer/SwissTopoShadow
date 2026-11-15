@@ -79,7 +79,7 @@ function setRegion(r) {
   region = r; store.set('region', r);
   // Ausschnitt und Punkt gehören zum alten Gebiet
   mv.removeOverlay(); for (const k in renderers) delete renderers[k];
-  area = null; $('timebox').hidden = true; $('legend').hidden = true; $('area-status').textContent = '';
+  area = null; chartMarkU = null; $('timebox').hidden = true; $('legend').hidden = true; $('area-status').textContent = '';
   applyRegion();
   if (pointTerrain) showPoint(pointTerrain.lat, pointTerrain.lon);
 }
@@ -202,70 +202,171 @@ function extremeDays(year, E, N, proj) {
   return len(jun) >= len(dec) ? { long: jun, short: dec } : { long: dec, short: jun }; // Südhalbkugel: umgekehrt
 }
 
-let chartGeom = null;
+let chartGeom = null, chartData = null, chartView = null, chartMarkU = null;
+const CW = 640, CH_ = 230, CL = 30, CB = 22, CT = 6, CR = 6; // Grafikmasse (viewBox) und Ränder
+
+/** Daten fürs Profil vorbereiten (teuer), danach renderChart (bei Zoom/Verschieben nur dieses). */
 function drawChart(az, h, times, E, N, lit, proj, pt = {}) {
-  const W = 640, H = 230, L0 = 30, B = 22, T = 6, R = 6;
   const lat = proj.toLatLon(E, N).lat;
   const center = lat >= 0 ? 180 : 0; // Mitte der Grafik: Süden (Nordhalbkugel) bzw. Norden
   const rel = a => ((a - center + 540) % 360) - 180;
   const year = $('date').value.slice(0, 4), ex = extremeDays(year, E, N, proj);
   const path = day => { const t0 = dayStart(day); return Array.from({ length: 1440 / 2 }, (_, i) => ({ u: t0 + 120 * i, ...sunPositionGrid(t0 + 120 * i, E, N, proj) })); };
   const sLong = path(ex.long), sShort = path(ex.short);
-  const suns = times.map(u => sunPositionGrid(u, E, N, proj));
+  const suns = times.map(u => ({ u, ...sunPositionGrid(u, E, N, proj) }));
   const up = [...sLong, ...suns].filter(s => s.el > -1).map(s => rel(s.az));
   const r0 = Math.max(-180, Math.min(-90, Math.floor((Math.min(...up) - 8) / 15) * 15));
   const r1 = Math.min(180, Math.max(90, Math.ceil((Math.max(...up) + 8) / 15) * 15));
   const vis = az.map((a, i) => (rel(a) >= r0 && rel(a) <= r1 ? h[i] : 0));
   const maxEl = Math.ceil((Math.max(30, ...sLong.map(s => s.el), ...vis) + 3) / 10) * 10;
-  const x = r => L0 + (r - r0) / (r1 - r0) * (W - L0 - R), y = e => H - B - Math.max(0, e) / maxEl * (H - B - T);
-  chartGeom = { x, y, rel, E, N, proj };
-  // Horizont (nach relativem Azimut sortiert)
-  // Grau: Gelände allein; darüber farbig, was Wald/Bäume (grün) bzw. Gebäude (rot) zusätzlich verdecken
+  // Horizont nach relativem Azimut sortiert: [r, h, Gelände allein, Klasse]
   const bare = pt.bare ?? h, cls = pt.cls ?? new Uint8Array(az.length);
-  const hz = az.map((a, i) => [rel(a), h[i], bare[i], cls[i]]).filter(([r]) => r >= r0 && r <= r1).sort((p, q) => p[0] - q[0]);
-  const P = (r, v) => `${x(r).toFixed(1)},${y(v).toFixed(1)}`;
-  let d = `M${x(r0)},${y(0)}`; hz.forEach(([r, , b]) => { d += `L${P(r, b)}`; }); d += `L${x(r1)},${y(0)}Z`;
-  const objPaths = { 1: '', 2: '' }, half = 0.125;
-  for (let i = 0; i < hz.length;) {
-    const k = hz[i][3];
-    if (!k) { i++; continue; }
-    let j = i; while (j + 1 < hz.length && hz[j + 1][3] === k) j++;
-    const run = hz.slice(i, j + 1), ra = run[0][0] - half, rb = run[run.length - 1][0] + half;
-    objPaths[k] += `M${P(ra, run[0][2])}L${P(ra, run[0][1])}` + run.map(([r, v]) => `L${P(r, v)}`).join('')
-      + `L${P(rb, run[run.length - 1][1])}L${P(rb, run[run.length - 1][2])}` + [...run].reverse().map(([r, , b]) => `L${P(r, b)}`).join('') + 'Z';
-    i = j + 1;
-  }
-  const line = list => { let s = '', prev = null; list.forEach(p => { if (p.el < -0.5) { prev = null; return; } const r = rel(p.az); const pt = `${x(r).toFixed(1)},${y(p.el).toFixed(1)}`; s += (prev === null || Math.abs(r - prev) > 90 ? 'M' : 'L') + pt; prev = r; }); return s; };
-  let dots = '', ticks = '', axes = '';
-  suns.forEach((p, i) => {
-    if (p.el < -0.5) return;
-    const r = rel(p.az);
-    if (r < r0 || r > r1) return;
-    if (lit[i] && i % 3 === 0) dots += `<circle cx="${x(r).toFixed(1)}" cy="${y(p.el).toFixed(1)}" r="2.6" fill="#e8820c"/>`;
-    if (i % 60 === 0) ticks += `<text x="${x(r)}" y="${y(p.el) - 6}" font-size="11" text-anchor="middle" fill="#3d4a42">${fmtTime(p.u ?? times[i]).slice(0, 2)}h</text>`;
-  });
-  const names = { 0: 'N', 45: 'NO', 90: 'O', 135: 'SO', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
-  for (const [a, l] of Object.entries(names)) { const r = rel(+a); if (r >= r0 && r <= r1) axes += `<text x="${x(r)}" y="${H - 5}" font-size="11" text-anchor="middle" fill="#5d6a62">${l}</text>`; }
-  for (let e = 0; e <= maxEl; e += 10) axes += `<line x1="${L0}" x2="${W - R}" y1="${y(e)}" y2="${y(e)}" stroke="#e6e6e0"/><text x="${L0 - 4}" y="${y(e) + 4}" font-size="10" text-anchor="end" fill="#5d6a62">${e}°</text>`;
-  $('chart').innerHTML = `${axes}<path d="${d}" fill="#9b9d96" opacity=".85"/>`
-    + `<path d="${objPaths[1]}" fill="#5f9a4e" opacity=".9"/><path d="${objPaths[2]}" fill="#c8473a" opacity=".9"/>`
-    + `<path d="${line(sLong)}" fill="none" stroke="#c9a227" stroke-width="1.4" stroke-dasharray="4 3"/>`
-    + `<path d="${line(sShort)}" fill="none" stroke="#5a7fb0" stroke-width="1.4" stroke-dasharray="4 3"/>`
-    + `<path d="${line(suns)}" fill="none" stroke="#d9822b" stroke-width="1.6"/>${dots}${ticks}<g id="nowmark"></g>`;
+  const hz = az.map((a, i) => [rel(a), h[i], bare[i], cls[i]]).sort((p, q) => p[0] - q[0]);
+  hz.unshift([hz[hz.length - 1][0] - 360, ...hz[hz.length - 1].slice(1)]); hz.push([hz[1][0] + 360, ...hz[1].slice(1)]); // Rand schliessen
+  chartData = { rel, center, r0, r1, maxEl, hz, sLong, sShort, suns, lit, E, N, proj };
+  chartView = null;
+  renderChart();
   const fd = day => new Date(`${day}T12:00:00Z`).toLocaleDateString('de-CH', { day: 'numeric', month: 'numeric', timeZone: 'UTC' });
-  const has = k => hz.some(p => p[3] === k);
+  const has = k => hz.some(p => p[3] === k && p[0] >= r0 && p[0] <= r1);
   $('lg-obj').innerHTML = '<span class="sw sw-ter"></span>Gelände'
     + (has(1) ? '<span class="sw sw-tree"></span>Wald/Bäume' : '') + (has(2) ? '<span class="sw sw-bld"></span>Gebäude' : '');
   $('lg-day').textContent = fd($('date').value); $('lg-sum').textContent = `längster Tag (${fd(ex.long)})`; $('lg-win').textContent = `kürzester Tag (${fd(ex.short)})`;
   updateProfileVisibility();
 }
 
+/** Sichtbarer Bereich: ganzer Bereich, oder gezoomt {k, ca, ce} (Faktor, Mitte Azimut/Höhe) – im Rahmen gehalten. */
+function chartRange() {
+  const { r0, r1, maxEl } = chartData;
+  if (!chartView) return { a0: r0, a1: r1, e0: 0, e1: maxEl, k: 1 };
+  const k = chartView.k, sa = (r1 - r0) / k, se = maxEl / k;
+  const ca = Math.min(r1 - sa / 2, Math.max(r0 + sa / 2, chartView.ca)), ce = Math.min(maxEl - se / 2, Math.max(se / 2, chartView.ce));
+  chartView.ca = ca; chartView.ce = ce;
+  return { a0: ca - sa / 2, a1: ca + sa / 2, e0: ce - se / 2, e1: ce + se / 2, k };
+}
+
+function renderChart() {
+  if (!chartData) return;
+  const { rel, center, hz, sLong, sShort, suns, lit, E, N, proj } = chartData;
+  const { a0, a1, e0, e1, k } = chartRange();
+  const W = CW, H = CH_, L0 = CL, B = CB, T = CT, R = CR;
+  const x = r => L0 + (r - a0) / (a1 - a0) * (W - L0 - R), y = e => H - B - (e - e0) / (e1 - e0) * (H - B - T);
+  chartGeom = { x, y, rel, E, N, proj, e0 };
+  const inA = r => r >= a0 - 2 && r <= a1 + 2;
+  const P = (r, v) => `${x(r).toFixed(1)},${y(v).toFixed(1)}`;
+  const vz = hz.filter(p => inA(p[0])), yb = y(e0) + 2;
+  let d = vz.length ? `M${x(vz[0][0]).toFixed(1)},${yb}` : '';
+  vz.forEach(([r, , b]) => { d += `L${P(r, b)}`; }); if (vz.length) d += `L${x(vz[vz.length - 1][0]).toFixed(1)},${yb}Z`;
+  // Grau: Gelände allein; darüber farbig, was Wald/Bäume (grün) bzw. Gebäude (rot) zusätzlich verdecken
+  const objPaths = { 1: '', 2: '' }, half = 0.125;
+  for (let i = 0; i < vz.length;) {
+    const c = vz[i][3];
+    if (!c) { i++; continue; }
+    let j = i; while (j + 1 < vz.length && vz[j + 1][3] === c) j++;
+    const run = vz.slice(i, j + 1), ra = run[0][0] - half, rb = run[run.length - 1][0] + half;
+    objPaths[c] += `M${P(ra, run[0][2])}L${P(ra, run[0][1])}` + run.map(([r, v]) => `L${P(r, v)}`).join('')
+      + `L${P(rb, run[run.length - 1][1])}L${P(rb, run[run.length - 1][2])}` + [...run].reverse().map(([r, , b]) => `L${P(r, b)}`).join('') + 'Z';
+    i = j + 1;
+  }
+  const line = list => { let s = '', prev = null; list.forEach(p => { if (p.el < -0.5) { prev = null; return; } const r = rel(p.az); s += (prev === null || Math.abs(r - prev) > 90 ? 'M' : 'L') + P(r, p.el); prev = r; }); return s; };
+  // Sonnenpunkte und Zeitmarken: gezoomt dichter (stündlich → viertelstündlich → alle 5 min)
+  const tStep = k >= 8 ? 5 : k >= 3 ? 15 : 60, dStep = k >= 3 ? 1 : 3;
+  let dots = '', ticks = '', axes = '';
+  suns.forEach((p, i) => {
+    if (p.el < -0.5) return;
+    const r = rel(p.az);
+    if (r < a0 || r > a1 || p.el < e0 || p.el > e1) return;
+    if (lit[i] && i % dStep === 0) dots += `<circle cx="${x(r).toFixed(1)}" cy="${y(p.el).toFixed(1)}" r="2.6" fill="#e8820c"/>`;
+    if (i % tStep === 0) ticks += `<text x="${x(r).toFixed(1)}" y="${(y(p.el) - 6).toFixed(1)}" font-size="11" text-anchor="middle" fill="#3d4a42">${tStep === 60 ? fmtTime(p.u).slice(0, 2) + 'h' : fmtTime(p.u)}</text>`;
+  });
+  // Achsen: Himmelsrichtungen, gezoomt zusätzlich Grad
+  const names = { 0: 'N', 45: 'NO', 90: 'O', 135: 'SO', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+  const aStep = [45, 15, 10, 5, 2, 1].find(s => (a1 - a0) / s >= 4) ?? 1;
+  for (let r = Math.ceil(a0 / aStep) * aStep; r <= a1; r += aStep) {
+    const az = ((r + center) % 360 + 360) % 360;
+    const lab = names[az] ?? (aStep < 45 ? `${az}°` : null);
+    if (lab) axes += `<text x="${x(r).toFixed(1)}" y="${H - 5}" font-size="11" text-anchor="middle" fill="#5d6a62">${lab}</text>`;
+  }
+  const eStep = [10, 5, 2, 1, 0.5].find(s => (e1 - e0) / s >= 3) ?? 0.5;
+  for (let ev = Math.ceil(e0 / eStep) * eStep; ev <= e1 + 1e-9; ev += eStep) {
+    axes += `<line x1="${L0}" x2="${W - R}" y1="${y(ev).toFixed(1)}" y2="${y(ev).toFixed(1)}" stroke="#e6e6e0"/><text x="${L0 - 4}" y="${(y(ev) + 4).toFixed(1)}" font-size="10" text-anchor="end" fill="#5d6a62">${+ev.toFixed(1)}°</text>`;
+  }
+  $('chart').innerHTML = `<defs><clipPath id="plotclip"><rect x="${L0}" y="0" width="${W - L0 - R}" height="${H - B}"/></clipPath></defs>${axes}`
+    + `<g clip-path="url(#plotclip)"><path d="${d}" fill="#9b9d96" opacity=".85"/>`
+    + `<path d="${objPaths[1]}" fill="#5f9a4e" opacity=".9"/><path d="${objPaths[2]}" fill="#c8473a" opacity=".9"/>`
+    + `<path d="${line(sLong)}" fill="none" stroke="#c9a227" stroke-width="1.4" stroke-dasharray="4 3"/>`
+    + `<path d="${line(sShort)}" fill="none" stroke="#5a7fb0" stroke-width="1.4" stroke-dasharray="4 3"/>`
+    + `<path d="${line(suns)}" fill="none" stroke="#d9822b" stroke-width="1.6"/>${dots}${ticks}<g id="nowmark"></g></g>`;
+  $('preset').hidden = !chartView;
+  if (chartMarkU !== null) markProfile(chartMarkU);
+}
+
+// Zoomen im Profil: zwei Finger (Pinch), Mausrad; mit einem Finger verschieben; Doppeltipp oder ⟲ = ganzer Bereich
+{
+  const svg = $('chart'), pts = new Map();
+  let start = null, lastTap = 0, tap = null;
+  const toData = (cx, cy) => { // Bildschirm -> Azimut/Höhe im aktuellen Bereich
+    const b = svg.getBoundingClientRect(), { a0, a1, e0, e1 } = chartRange();
+    const sx = (cx - b.left) / b.width * CW, sy = (cy - b.top) / b.height * CH_;
+    return { a: a0 + (sx - CL) / (CW - CL - CR) * (a1 - a0), e: e0 + (CH_ - CB - sy) / (CH_ - CB - CT) * (e1 - e0) };
+  };
+  const zoomAt = (k, cx, cy, ref) => { // Faktor k, Punkt ref (Daten) bleibt unter (cx, cy)
+    const { r0, r1, maxEl } = chartData;
+    k = Math.min((r1 - r0) / 3, Math.max(1, k));
+    if (k <= 1.001) { chartView = null; renderChart(); return; }
+    chartView = { k, ca: 0, ce: 0 };
+    const b = svg.getBoundingClientRect(), sx = (cx - b.left) / b.width * CW, sy = (cy - b.top) / b.height * CH_;
+    const fa = (sx - CL) / (CW - CL - CR), fe = (CH_ - CB - sy) / (CH_ - CB - CT);
+    chartView.ca = ref.a - (fa - 0.5) * (r1 - r0) / k; chartView.ce = ref.e - (fe - 0.5) * maxEl / k;
+    renderChart();
+  };
+  const reset = () => { chartView = null; renderChart(); };
+  svg.style.touchAction = 'none';
+  svg.addEventListener('pointerdown', ev => {
+    if (!chartData) return;
+    svg.setPointerCapture(ev.pointerId); pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    tap = pts.size === 1 ? { t: Date.now(), x: ev.clientX, y: ev.clientY } : null; // Doppeltipp erkennen
+    const p = [...pts.values()], k = chartView?.k ?? 1;
+    if (p.length === 2) {
+      const cx = (p[0].x + p[1].x) / 2, cy = (p[0].y + p[1].y) / 2;
+      start = { mode: 'pinch', k, dist: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, ref: toData(cx, cy) };
+    } else if (p.length === 1) start = { mode: 'pan', ref: toData(p[0].x, p[0].y) };
+  });
+  svg.addEventListener('pointermove', ev => {
+    if (!pts.has(ev.pointerId) || !start) return;
+    pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    const p = [...pts.values()];
+    if (start.mode === 'pinch' && p.length === 2) {
+      const dist = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      zoomAt(start.k * dist / start.dist, (p[0].x + p[1].x) / 2, (p[0].y + p[1].y) / 2, start.ref);
+    } else if (start.mode === 'pan' && p.length === 1 && chartView) {
+      zoomAt(chartView.k, p[0].x, p[0].y, start.ref);
+    }
+  });
+  const up = ev => {
+    pts.delete(ev.pointerId);
+    if (tap && !pts.size && Date.now() - tap.t < 250 && Math.hypot(ev.clientX - tap.x, ev.clientY - tap.y) < 8) {
+      if (Date.now() - lastTap < 350) { reset(); lastTap = 0; } else lastTap = Date.now();
+    }
+    if (pts.size) tap = null;
+    const p = [...pts.values()];
+    start = p.length === 1 ? { mode: 'pan', ref: toData(p[0].x, p[0].y) } : null; // nach Pinch mit einem Finger weiter verschieben
+  };
+  svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
+  svg.addEventListener('wheel', ev => {
+    if (!chartData) return;
+    ev.preventDefault();
+    zoomAt((chartView?.k ?? 1) * Math.exp(-ev.deltaY * 0.002), ev.clientX, ev.clientY, toData(ev.clientX, ev.clientY));
+  }, { passive: false });
+  $('preset').onclick = reset;
+}
+
 /** Markiert den Sonnenstand zur Zeit u (Zeitschieber) im Profil. */
 function markProfile(u) {
   const g = document.getElementById('nowmark');
+  chartMarkU = u;
   if (!g || !chartGeom) return;
-  const { x, y, rel, E, N, proj } = chartGeom, s = sunPositionGrid(u, E, N, proj);
-  g.innerHTML = s.el > -0.5 ? `<line x1="${x(rel(s.az))}" x2="${x(rel(s.az))}" y1="${y(0)}" y2="${y(s.el)}" stroke="#d4442e" stroke-width="1" stroke-dasharray="2 2"/><circle cx="${x(rel(s.az))}" cy="${y(s.el)}" r="5" fill="none" stroke="#d4442e" stroke-width="2"/>` : '';
+  const { x, y, rel, E, N, proj, e0 } = chartGeom, s = sunPositionGrid(u, E, N, proj);
+  g.innerHTML = s.el > -0.5 ? `<line x1="${x(rel(s.az))}" x2="${x(rel(s.az))}" y1="${y(Math.max(0, e0))}" y2="${y(s.el)}" stroke="#d4442e" stroke-width="1" stroke-dasharray="2 2"/><circle cx="${x(rel(s.az))}" cy="${y(s.el)}" r="5" fill="none" stroke="#d4442e" stroke-width="2"/>` : '';
 }
 
 mv.onClick((lat, lon) => showPoint(lat, lon));

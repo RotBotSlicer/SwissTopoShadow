@@ -6,7 +6,8 @@ Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhen
   sonst weltweit über Photon (OpenStreetMap); ein Treffer ausserhalb der Schweiz schaltet auf „Weltweit“.
 - **Ort antippen:** Sonnenzeiten am Punkt. Profil oben über der Karte (Schalter „Profil“): Horizont, Sonnenbahn des
   gewählten Tages sowie des längsten und kürzesten Tages; beim Zeitschieber zeigt ein Kreis den aktuellen Sonnenstand.
-  Auf der Südhalbkugel ist Norden in der Mitte. Mit „Wald und Gebäude“ ist der Horizont nach Ursache eingefärbt:
+  Auf der Südhalbkugel ist Norden in der Mitte. Zoomen mit zwei Fingern (Mausrad), verschieben mit einem Finger,
+  Doppeltipp oder ⟲ zeigt wieder den ganzen Horizont. Mit „Wald und Gebäude“ ist der Horizont nach Ursache eingefärbt:
   Gelände grau, Wald/Bäume grün, Gebäude rot (Dachflächen-Layer des BFE auf Basis swissBUILDINGS3D, 2.5 m).
 - **3D:** Schatten über die ganze schräge Ansicht – vorne fein, dahinter ein grober Fernbereich bis zum Horizont (±30 km).
 - **Schatten für Ausschnitt:** Schatten über der Landeskarte mit Zeitschieber und Animation,

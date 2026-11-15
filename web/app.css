@@ -67,3 +67,4 @@ body.has-profile #sbtn { top:calc(var(--ph, 0px) + 16px); }
 #sres li:hover, #sres li.sel { background:#f0efe9; }
 #sres .sn { font-weight:600; } #sres .sd { font-size:.8rem; color:var(--mut); }
 #sinfo:empty { display:none; } #sinfo { padding:4px 8px; }
+#preset { border:0; background:none; font-size:1.15rem; line-height:1; padding:0 6px; }

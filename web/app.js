@@ -467,7 +467,7 @@ async function computeArea() {
     hours = null;
     mv.removeOverlay();
     for (const L of layers) await mv.setOverlay(L.id, L.renderer.canvas, L.b);
-    await mv.setOutline(layers.map(L => L.b));
+    await mv.setOutline([layers[0].b]); // nur die äussere Grenze (Fernbereich, sonst der einzige Bereich)
     prepareDay();
     const g = near.grid, fr = layers.length > 1 ? layers[0] : null;
     area.statusText = () => t('areaInfo', { w: g.w, h: g.h, px: g.pixelSize.toFixed(1), lod: lodName(near.lod) })

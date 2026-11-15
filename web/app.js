@@ -116,6 +116,7 @@ const pyramid = () => (pyramidP ??= Pyramid.open('./data/pyramid'));
 let pointTerrain = null;
 async function showPoint(lat, lon) {
   if (isCH() && !inCH(lat, lon)) { status(t('outsideCH')); return; }
+  store.set('point', { lat, lon }); // beim nächsten Öffnen wieder anzeigen
   setTZ(lat, lon);
   const proj = projFor(lat, lon);
   const { E, N } = proj.fromLatLon(lat, lon);
@@ -651,5 +652,11 @@ function switchLang(l) {
 $('lang-de').onclick = () => switchLang('de');
 $('lang-en').onclick = () => switchLang('en');
 showLang();
+
+// Zuletzt angetippten Punkt wiederherstellen (Karte steht schon an der letzten Stelle)
+{
+  const p0 = store.get('point');
+  if (p0 && Number.isFinite(p0.lat) && Number.isFinite(p0.lon)) mv.ready.then(() => showPoint(p0.lat, p0.lon));
+}
 
 window.__app = { mv, setView: (lat, lon, z) => mv.setView(lat, lon, z), get area() { return area; }, get suns() { return suns; }, get point() { return pointTerrain; }, showPoint, computeArea, setRegion };

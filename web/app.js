@@ -59,7 +59,7 @@ function toast(text, ms = 7000) {
 
 // ------------------------------------------------------------ Karte
 let base = store.get('base') === 'air' ? 'air' : 'map';
-const start = store.get('view') ?? { lat: 46.9682, lon: 9.0062, z: 15 };
+const start = store.get('view') ?? { lat: 45.9700, lon: 7.6586, z: 13 }; // erster Besuch: Matterhorn (etwas südlich, damit der Gipfel über dem Menü in der Mitte steht)
 const mv = new MapView('map', {
   lat: start.lat, lon: start.lon, zoom: start.z,
   // Höhenkacheln für 3D: Schweiz aus Pyramide/swissALTIRegio (+ feines Gelände des Ausschnitts), sonst Copernicus

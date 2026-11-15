@@ -9,6 +9,7 @@ import { LV95, localTM } from './lib/coords.js';
 import { mercatorGrid, gridSizeFor } from './lib/area.js';
 import { ShadowRenderer } from './lib/gpu.js';
 import { tzlookup } from 'tz-lookup';
+import { MapView } from './mapview.js';
 
 const $ = id => document.getElementById(id);
 // Fehler sichtbar machen (z. B. auf dem Handy ohne Entwicklerwerkzeuge)
@@ -47,20 +48,11 @@ const status = t => { $('status').textContent = t; };
 
 // ------------------------------------------------------------ Karte
 const start = store.get('view') ?? { lat: 46.9682, lon: 9.0062, z: 15 };
-const map = L.map('map', { zoomControl: false, attributionControl: true }).setView([start.lat, start.lon], start.z);
-L.control.zoom({ position: 'topright' }).addTo(map);
-const wmts = (layer, fmt, opts = {}) => L.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${fmt}`,
-  { maxZoom: 19, maxNativeZoom: 18, attribution: '© <a href="https://www.swisstopo.admin.ch">swisstopo</a>', ...opts });
-const layersCH = [wmts('ch.swisstopo.pixelkarte-farbe', 'jpeg'), wmts('ch.swisstopo.swisstlm3d-wanderwege', 'png', { opacity: 0.9, attribution: '', minZoom: 13 })];
-const layersWorld = [L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-  subdomains: 'abc', maxZoom: 19, maxNativeZoom: 17,
-  attribution: 'Karte © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) · Daten © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende, SRTM',
-})];
-map.on('moveend', () => { const c = map.getCenter(); store.set('view', { lat: c.lat, lon: c.lng, z: map.getZoom() }); updateAreaButton(); });
+const mv = new MapView('map', { lat: start.lat, lon: start.lon, zoom: start.z });
+mv.onMoveEnd(() => { const c = mv.center(); store.set('view', { lat: c.lat, lon: c.lon, z: mv.zoom() }); updateAreaButton(); });
 
 function applyRegion() {
-  for (const l of [...layersCH, ...layersWorld]) map.removeLayer(l);
-  (isCH() ? layersCH : layersWorld).forEach(l => l.addTo(map));
+  mv.setRegion(region);
   $('reg-ch').setAttribute('aria-checked', String(isCH())); $('reg-world').setAttribute('aria-checked', String(!isCH()));
   $('surface-row').hidden = !isCH(); $('world-note').hidden = isCH();
   $('credits').innerHTML = isCH()
@@ -72,22 +64,11 @@ function setRegion(r) {
   if (r === region) return;
   region = r; store.set('region', r);
   // Ausschnitt und Punkt gehören zum alten Gebiet
-  if (overlay) { map.removeLayer(overlay); overlay = null; renderer = null; }
+  mv.removeOverlay(); renderer = null;
   area = null; $('timebox').hidden = true; $('legend').hidden = true; $('area-status').textContent = '';
   applyRegion();
   if (pointTerrain) showPoint(pointTerrain.lat, pointTerrain.lon);
 }
-
-// Leaflet-Ebene, die ein <canvas> statt eines Bildes zeigt (wie L.ImageOverlay)
-const CanvasOverlay = L.ImageOverlay.extend({
-  _initImage() {
-    const el = this._image = this._url;
-    L.DomUtil.addClass(el, 'leaflet-image-layer');
-    if (this._zoomAnimated) L.DomUtil.addClass(el, 'leaflet-zoom-animated');
-    el.style.imageRendering = 'auto';
-    el.onselectstart = L.Util.falseFn; el.onmousemove = L.Util.falseFn;
-  },
-});
 
 // ------------------------------------------------------------ Datum / Zeiten
 function todayStr() { return new Date().toLocaleDateString('sv-SE', { timeZone: TZ }); }
@@ -109,14 +90,13 @@ let pyramidP = null;
 const pyramid = () => (pyramidP ??= Pyramid.open('./data/pyramid'));
 
 // ------------------------------------------------------------ Punkt
-let marker = null, pointTerrain = null;
+let pointTerrain = null;
 async function showPoint(lat, lon) {
   if (isCH() && !inCH(lat, lon)) { status('Ausserhalb der Schweiz: oben auf „Weltweit“ umschalten.'); return; }
   setTZ(lat, lon);
   const proj = projFor(lat, lon);
   const { E, N } = proj.fromLatLon(lat, lon);
-  marker ??= L.circleMarker([lat, lon], { radius: 8, color: '#fff', weight: 2, fillColor: '#d4442e', fillOpacity: 1 }).addTo(map);
-  marker.setLatLng([lat, lon]);
+  mv.setMarker(lat, lon);
   $('hint').hidden = true; $('point').hidden = false;
   $('where').textContent = 'rechne…';
   $('summary').textContent = ''; $('ivs').textContent = ''; $('chart').innerHTML = '';
@@ -247,21 +227,18 @@ function markProfile(u) {
   g.innerHTML = s.el > -0.5 ? `<line x1="${x(rel(s.az))}" x2="${x(rel(s.az))}" y1="${y(0)}" y2="${y(s.el)}" stroke="#d4442e" stroke-width="1" stroke-dasharray="2 2"/><circle cx="${x(rel(s.az))}" cy="${y(s.el)}" r="5" fill="none" stroke="#d4442e" stroke-width="2"/>` : '';
 }
 
-map.on('click', e => showPoint(e.latlng.lat, e.latlng.lng));
+mv.onClick((lat, lon) => showPoint(lat, lon));
 
 // ------------------------------------------------------------ Ausschnitt / Schatten
-let area = null, renderer = null, overlay = null, suns = [], playing = false, hours = null, selectedMinute = null;
+let area = null, renderer = null, suns = [], playing = false, hours = null, selectedMinute = null;
 
-function viewBounds() {
-  const b = map.getBounds();
-  return { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
-}
+const viewBounds = () => mv.viewBounds();
 const minPx = () => (isCH() ? 3 : 10); // weltweit: Daten 30 m, feinere Pixel bringen nichts
-function viewProj() { const c = map.getCenter(); return projFor(c.lat, c.lng); }
+function viewProj() { const c = mv.center(); return projFor(c.lat, c.lon); }
 function updateAreaButton() {
   if (!$('area')) return;
-  const c = map.getCenter();
-  if (isCH() && !inCH(c.lat, c.lng)) {
+  const c = mv.center();
+  if (isCH() && !inCH(c.lat, c.lon)) {
     $('area').disabled = true; $('area').textContent = 'Ausserhalb der Schweiz';
     $('region-info').textContent = '→ „Weltweit“ wählen'; return;
   }
@@ -278,7 +255,7 @@ async function computeArea() {
   const b = viewBounds(), proj = viewProj(), { w, h } = gridSizeFor(b, minPx(), GRID_PX, proj);
   const grid = mercatorGrid(b, w, h, proj);
   const lod = areaLod(grid.pixelSize);
-  const c = map.getCenter(); setTZ(c.lat, c.lng);
+  const c = mv.center(); setTZ(c.lat, c.lon);
   $('area').disabled = true;
   try {
     $('area-status').textContent = 'Lade Höhendaten…';
@@ -288,14 +265,12 @@ async function computeArea() {
       })
       : await loadTerrainWorld(grid.bboxLv95, proj, { rMax: R_MAX, lod });
     $('area-status').textContent = 'Bereite Grafikkarte vor…';
-    const canvas = overlay?._image ?? document.createElement('canvas');
-    renderer ??= new ShadowRenderer(canvas);
+    renderer ??= new ShadowRenderer(document.createElement('canvas'));
     renderer.setTerrain(terrain, grid.center);
     renderer.setGrid(grid);
     area = { grid, terrain, lod, proj, tz: TZ };
     hours = null;
-    if (overlay) overlay.setBounds([[b.south, b.west], [b.north, b.east]]);
-    else overlay = new CanvasOverlay(canvas, [[b.south, b.west], [b.north, b.east]], { opacity: 1, interactive: false }).addTo(map);
+    await mv.setOverlay(renderer.canvas, b);
     prepareDay();
     $('area-status').textContent = `${w}×${h} Pixel à ${grid.pixelSize.toFixed(1)} m · Gelände ${lodName(lod)}`;
     $('sheet').classList.add('collapsed'); // Karte freigeben, Zeitschieber bleibt sichtbar
@@ -337,13 +312,14 @@ function draw() {
       const mx = suns.length * STEP_MIN / 60;
       $('legend').innerHTML = `<span>0 h</span><span class="ramp" style="background:linear-gradient(90deg,#29337a,#338c8c,#f2d94d,#ed731a)"></span><span>${mx.toFixed(1)} h</span>`;
       if (hours === null) computeHours(mx);
-      else if (hours.done) renderer.showSunHours(STEP_MIN, mx);
+      else if (hours.done) { renderer.showSunHours(STEP_MIN, mx); mv.overlayChanged(); }
       return;
     }
     const s = suns[+$('time').value];
     if (!s) return;
     TZ = area.tz;
     renderer.renderShadow(s.az, s.el, { rMax: R_MAX, grad: s.grad });
+    mv.overlayChanged();
     selectedMinute = (s.u - dayStart($('date').value)) / 60;
     $('timelbl').textContent = fmtTime(s.u);
     if (pointTerrain) { const tz = TZ; markProfile(s.u); TZ = tz; }
@@ -360,6 +336,7 @@ function computeHours(mx) {
     renderer.addSunHours(batch, { rMax: R_MAX });
     job.i += batch.length;
     renderer.showSunHours(STEP_MIN, mx);
+    mv.overlayChanged();
     $('area-status').textContent = job.i < suns.length ? `Sonnenstunden ${Math.round(100 * job.i / suns.length)} %` : `Sonnenstunden für ${$('date').value}`;
     if (job.i < suns.length) requestAnimationFrame(step); else job.done = true;
   };
@@ -399,7 +376,7 @@ $('locate').onclick = () => {
   if (!navigator.geolocation) return status('Standort nicht verfügbar');
   status('Suche Standort…');
   navigator.geolocation.getCurrentPosition(p => {
-    map.setView([p.coords.latitude, p.coords.longitude], Math.max(map.getZoom(), 15));
+    mv.setView(p.coords.latitude, p.coords.longitude, Math.max(mv.zoom(), 15));
     showPoint(p.coords.latitude, p.coords.longitude);
   }, err => status('Standort: ' + err.message), { enableHighAccuracy: true, timeout: 15000 });
 };
@@ -410,4 +387,4 @@ $('grip').onclick = () => $('sheet').classList.toggle('collapsed');
 
 applyRegion();
 // Für Tests: Zustand von aussen lesbar
-window.__app = { map, get area() { return area; }, get suns() { return suns; }, get point() { return pointTerrain; }, showPoint, computeArea, setRegion };
+window.__app = { mv, setView: (lat, lon, z) => mv.setView(lat, lon, z), get area() { return area; }, get suns() { return suns; }, get point() { return pointTerrain; }, showPoint, computeArea, setRegion };

@@ -46,7 +46,7 @@ with sync_playwright() as p:
     # Grosser Ausschnitt (Gelände automatisch gröber)
     pg.select_option("#mode", "shadow")
     for z, name in [(13, "mittel"), (11, "gross")]:
-        pg.evaluate(f"__app.map.setZoom({z}, {{animate: false}})")
+        pg.evaluate(f"__app.setView(__app.mv.center().lat, __app.mv.center().lon, {z})")
         pg.wait_for_timeout(2500)
         print(f"Knopf ({name}):", pg.inner_text("#area"))
         pg.evaluate("document.getElementById('area-status').textContent = ''")

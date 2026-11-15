@@ -97,12 +97,16 @@ async function loadKmTiles(tiles, res, getImage, onProgress) {
 }
 
 let regioTiff = null;
-/** swissALTIRegio 10 m über bounds direkt aus dem COG (HTTP-Range-Requests). */
-export async function loadRegio([xmin, ymin, xmax, ymax], url = REGIO_COG) {
+/** swissALTIRegio über bounds direkt aus dem COG (HTTP-Range-Requests).
+ *  overview 0 = 10 m; 1, 2, 3 … = Übersichtsstufen 40, 80, 160 m (ausgedünnt; nur für die Darstellung). */
+export async function loadRegio([xmin, ymin, xmax, ymax], url = REGIO_COG, overview = 0) {
   regioTiff ??= fromUrl(url, { allowFullFile: false });
-  const img = await (await regioTiff).getImage(0);
-  const [X0, Y0] = img.getOrigin(), [res] = img.getResolution();
-  const W = img.getWidth(), H = img.getHeight(), nod = img.getGDALNoData();
+  const tiff = await regioTiff;
+  const full = await tiff.getImage(0);
+  const img = overview ? await tiff.getImage(Math.min(overview, (await tiff.getImageCount()) - 1)) : full;
+  const [X0, Y0] = full.getOrigin();
+  const res = full.getResolution()[0] * full.getWidth() / img.getWidth();
+  const W = img.getWidth(), H = img.getHeight(), nod = full.getGDALNoData();
   const c0 = Math.floor((xmin - X0) / res), r0 = Math.floor((Y0 - ymax) / res);
   const c1 = Math.ceil((xmax - X0) / res), r1 = Math.ceil((Y0 - ymin) / res);
   const w = c1 - c0, h = r1 - r0;

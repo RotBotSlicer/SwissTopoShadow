@@ -37,8 +37,12 @@
     <div class="seg" role="radiogroup" aria-label="Gebiet">
       <button id="reg-ch" role="radio">Schweiz</button><button id="reg-world" role="radio">Weltweit</button>
     </div>
-    <span id="region-info" class="mut small"></span>
+    <div class="seg" id="base-seg" role="radiogroup" aria-label="Hintergrund">
+      <button id="base-map" role="radio">Karte</button><button id="base-air" role="radio">Luftbild</button>
+    </div>
+    <button id="t3d" aria-pressed="false" title="3D-Ansicht">3D</button>
   </div>
+  <div id="region-info" class="mut small"></div>
   <div class="bar">
     <input id="date" type="date" aria-label="Datum">
     <button id="today" title="Heute">Heute</button>

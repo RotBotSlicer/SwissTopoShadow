@@ -10,6 +10,7 @@ import { mercatorGrid, gridSizeFor } from './lib/area.js';
 import { ShadowRenderer } from './lib/gpu.js';
 import { tzlookup } from 'tz-lookup';
 import { MapView } from './mapview.js';
+import { heightsCH, heightsWorld, encodeTerrarium } from './lib/demtiles.js';
 
 const $ = id => document.getElementById(id);
 // Fehler sichtbar machen (z. B. auf dem Handy ohne Entwicklerwerkzeuge)
@@ -47,12 +48,23 @@ const fmtTime = u => new Date(u * 1000).toLocaleTimeString('de-CH', { hour: '2-d
 const status = t => { $('status').textContent = t; };
 
 // ------------------------------------------------------------ Karte
+let base = store.get('base') === 'air' ? 'air' : 'map';
 const start = store.get('view') ?? { lat: 46.9682, lon: 9.0062, z: 15 };
-const mv = new MapView('map', { lat: start.lat, lon: start.lon, zoom: start.z });
+const mv = new MapView('map', {
+  lat: start.lat, lon: start.lon, zoom: start.z,
+  // Höhenkacheln für 3D: Schweiz aus Pyramide/swissALTIRegio (+ feines Gelände des Ausschnitts), sonst Copernicus
+  dem: {
+    ch: async (z, x, y) => encodeTerrarium(await heightsCH(z, x, y, await pyramid(), area && isCH() ? area.terrain.ground : null)),
+    world: async (z, x, y) => encodeTerrarium(await heightsWorld(z, x, y)),
+  },
+});
 mv.onMoveEnd(() => { const c = mv.center(); store.set('view', { lat: c.lat, lon: c.lon, z: mv.zoom() }); updateAreaButton(); });
 
 function applyRegion() {
   mv.setRegion(region);
+  $('base-seg').hidden = !isCH();
+  mv.setBase(isCH() ? base : 'map');
+  $('base-map').setAttribute('aria-checked', String(base === 'map')); $('base-air').setAttribute('aria-checked', String(base === 'air'));
   $('reg-ch').setAttribute('aria-checked', String(isCH())); $('reg-world').setAttribute('aria-checked', String(!isCH()));
   $('surface-row').hidden = !isCH(); $('world-note').hidden = isCH();
   $('credits').innerHTML = isCH()
@@ -359,6 +371,12 @@ $('ptoggle').setAttribute('aria-pressed', String(store.get('profile') ?? true));
 $('ptoggle').onclick = () => setProfile(!profileOn());
 $('pclose').onclick = () => setProfile(false);
 $('reg-ch').onclick = () => setRegion('ch');
+$('base-map').onclick = () => { base = 'map'; store.set('base', base); applyRegion(); };
+$('base-air').onclick = () => { base = 'air'; store.set('base', base); applyRegion(); };
+$('t3d').onclick = () => {
+  const on = $('t3d').getAttribute('aria-pressed') !== 'true';
+  $('t3d').setAttribute('aria-pressed', String(on)); mv.set3D(on); updateAreaButton();
+};
 $('reg-world').onclick = () => setRegion('world');
 $('surface').onchange = () => {
   store.set('surface', surfaceOn());

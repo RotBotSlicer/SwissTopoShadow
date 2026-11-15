@@ -7,6 +7,10 @@ Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhen
   Auf der Südhalbkugel ist Norden in der Mitte.
 - **Schatten für Ausschnitt:** Schatten über der Landeskarte mit Zeitschieber und Animation,
   oder Sonnenstunden des Tages als Farbkarte. Gerechnet auf der Grafikkarte (WebGL2).
+- **3D-Ansicht (Schalter „3D“):** Gelände in 3D (Schweiz: swissALTI3D-Regio/feines Gelände des Ausschnitts, weltweit
+  Copernicus), Hintergrund Landeskarte oder Luftbild (Schweiz) bzw. OpenTopoMap; Schatten, Zeitschieber und Sonnenstunden
+  liegen auf dem 3D-Gelände. Das 3D-Gelände ist immer der Boden (ohne Wald/Gebäude); der Wald-Schalter wirkt auf den Schatten.
+  Höhenkacheln entstehen im Browser (js/src/demtiles.js, MapLibre-Protokoll).
 - **Gebiet Schweiz / Weltweit (Schalter):** Schweiz mit swisstopo (Landeskarte, Gelände bis 2 m, Wald).
   Weltweit mit offenen Daten: Copernicus DEM GLO-30 (30 m, Oberflächenmodell; Kopie bei OpenTopography, weil die
   AWS-Kopie keinen Browserzugriff erlaubt) und OpenTopoMap; gerechnet in einer lokalen Transversalen Mercator um den
@@ -23,7 +27,7 @@ Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhen
 | `python/` | Referenzkern in Python (Sonnenstand, Gelände, Horizont, Schatten) mit Tests |
 | `js/` | Gleicher Kern in JavaScript, getestet gegen die Python-Referenzwerte |
 | `data/pyramid/` | Grobmodell der Schweiz (40/80/160 m) aus swissALTIRegio, eigenes Kachelformat |
-| `web/` | Web-App (statisch, wird mit `js/src` und `data/` nach GitHub Pages gebaut) |
+| `web/` | Web-App (MapLibre GL; statisch, wird mit `js/src` und `data/` nach GitHub Pages gebaut), `web/proto3d/` 3D-Prototypen |
 | `tools/` | `build_site.sh` (Webseite zusammenstellen), `test_gpu.py` (WebGL vs. CPU im Browser), `e2e_app.py` (App-Test), `vendor_geotiff.sh` |
 
 ## Gelände (Level of Detail)

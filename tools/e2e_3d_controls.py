@@ -11,7 +11,7 @@ with sync_playwright() as p:
     pg = b.new_page(viewport={"width": 1100, "height": 800}, locale="de-CH"); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     u = f"http://127.0.0.1:{srv.server_port}/"
-    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear()"); pg.goto(u); pg.wait_for_timeout(1500)
+    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear(); localStorage.setItem('buildings3d','false')"); pg.goto(u); pg.wait_for_timeout(1500)
     cam = lambda: pg.evaluate("({b: __app.mv.map.getBearing(), p: __app.mv.map.getPitch(), z: __app.mv.map.getZoom()})")
     pg.evaluate("__app.setView(46.9682, 9.0062, 15)"); pg.wait_for_timeout(800)  # fester Ort (Software-Rendering ist bei grossem Gelände zu langsam)
     assert pg.is_hidden(".orbit-ctrl"), "Steuerung in 2D sichtbar"

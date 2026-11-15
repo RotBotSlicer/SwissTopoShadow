@@ -10,7 +10,7 @@ with sync_playwright() as p:
     pg.on("pageerror",lambda e: errs.append(str(e)))
     pg.on("console",lambda m: m.type=="error" and errs.append(m.text))
     u=f"http://127.0.0.1:{srv.server_port}/"
-    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear()"); pg.goto(u); pg.wait_for_timeout(1500)
+    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear(); localStorage.setItem('buildings3d','false')"); pg.goto(u); pg.wait_for_timeout(1500)
     pg.fill("#date","2026-11-14"); pg.dispatch_event("#date","change")
     pg.evaluate("__app.setView(46.9682, 9.0062, 13)"); pg.wait_for_timeout(800)
     pg.click("#t3d"); pg.wait_for_timeout(6000)

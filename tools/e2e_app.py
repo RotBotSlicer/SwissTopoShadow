@@ -22,7 +22,7 @@ with sync_playwright() as p:
     pg.on("console", lambda m: m.type == "error" and errs.append(m.text))
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.goto(f"http://127.0.0.1:{srv.server_port}/")
-    pg.evaluate("localStorage.clear()")
+    pg.evaluate("localStorage.clear(); localStorage.setItem('buildings3d','false')")
     pg.goto(f"http://127.0.0.1:{srv.server_port}/")
     pg.fill("#date", "2026-11-14"); pg.dispatch_event("#date", "change")
     pg.wait_for_timeout(2500)

@@ -11,7 +11,7 @@ with sync_playwright() as p:
     pg=b.new_page(viewport={"width":420,"height":800},device_scale_factor=2, locale="de-CH"); errs=[]
     pg.on("pageerror",lambda e: errs.append(str(e))); pg.on("console",lambda m: m.type=="error" and errs.append(m.text))
     u=f"http://127.0.0.1:{srv.server_port}/"
-    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear()"); pg.goto(u); pg.wait_for_timeout(1500)
+    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear(); localStorage.setItem('buildings3d','false')"); pg.goto(u); pg.wait_for_timeout(1500)
     pg.fill("#date","2026-11-15"); pg.dispatch_event("#date","change")
     if not pg.is_checked("#surface"): pg.check("#surface")
     pg.evaluate(f"__app.setView({lat},{lon},16)"); pg.wait_for_timeout(1000)

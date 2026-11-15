@@ -22,7 +22,7 @@ const showError = e => { const el = document.getElementById('status'); if (el) e
 window.addEventListener('error', ev => showError(ev.error ?? ev.message));
 window.addEventListener('unhandledrejection', ev => showError(ev.reason));
 const VERSION = (document.querySelector('meta[name="app-version"]')?.content ?? '').slice(0, 7);
-const R_MAX = 30000, STEP_MIN = 5, MAX_AREA_M = 50000, GRID_PX = 900;
+const R_MAX = 30000, STEP_MIN = 5, MAX_AREA_M = 50000, GRID_PX = 900, GRID_PX_NEAR3D = 1400;
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
 
 // ------------------------------------------------------------ Gebiet
@@ -387,7 +387,19 @@ mv.onClick((lat, lon) => showPoint(lat, lon));
 let area = null, suns = [], playing = false, hours = null, selectedMinute = null;
 const renderers = {}; // id -> ShadowRenderer (werden wiederverwendet)
 
-const viewBounds = () => mv.nearBounds();
+/** Feiner Bereich. In 3D möglichst weit (bis 2.5 km hinter dem unteren Bildrand), aber nur so weit, dass die Pixel
+ *  höchstens 4 m gross bleiben – sonst fielen Wald und Gebäude (2-m-Oberflächenmodell) weg. */
+function viewBounds() {
+  if (!mv.is3D || mv.map.getPitch() < 1) return mv.nearBounds();
+  let b;
+  for (const reach of [2500, 1800, 1200, 800]) {
+    b = mv.nearBounds(reach);
+    const s = gridSizeFor(b, minPx(), gridPx(), viewProj());
+    if (Math.max(s.widthM / s.w, s.heightM / s.h) <= 4) break;
+  }
+  return b;
+}
+const gridPx = () => (mv.is3D && mv.map.getPitch() >= 1 ? GRID_PX_NEAR3D : GRID_PX);
 const minPx = () => (isCH() ? 3 : 10); // weltweit: Daten 30 m, feinere Pixel bringen nichts
 const FAR_MIN_PX = 20;
 function viewProj() { const c = mv.center(); return projFor(c.lat, c.lon); }
@@ -400,7 +412,7 @@ function updateAreaButton() {
     $('region-info').textContent = t('chooseWorld'); return;
   }
   $('region-info').textContent = isCH() ? t('infoCH') : t('infoWorld');
-  const b = viewBounds(), s = gridSizeFor(b, minPx(), GRID_PX, viewProj());
+  const b = viewBounds(), s = gridSizeFor(b, minPx(), gridPx(), viewProj());
   const big = Math.max(s.widthM, s.heightM) > MAX_AREA_M;
   const px = Math.max(s.widthM / s.w, s.heightM / s.h);
   $('area').disabled = big;
@@ -434,8 +446,8 @@ function holeRect(outer, inner, w, h) {
   return { c0: Math.ceil(x(inner.west)) + 1, c1: Math.floor(x(inner.east)) - 1, r0: Math.ceil(y(inner.north)) + 1, r1: Math.floor(y(inner.south)) - 1 };
 }
 
-async function loadLayer(id, b, proj, targetPx, lodOf, label) {
-  const { w, h } = gridSizeFor(b, targetPx, GRID_PX, proj);
+async function loadLayer(id, b, proj, targetPx, lodOf, label, maxPx = GRID_PX) {
+  const { w, h } = gridSizeFor(b, targetPx, maxPx, proj);
   const grid = mercatorGrid(b, w, h, proj), lod = lodOf(grid.pixelSize);
   const terrain = isCH()
     ? await loadTerrainLod(grid.bboxLv95, await pyramid(), {
@@ -455,7 +467,7 @@ async function computeArea() {
   $('area').disabled = true;
   try {
     $('area-status').textContent = t('loadingDem');
-    const near = await loadLayer('near', b, proj, minPx(), areaLod, t('near'));
+    const near = await loadLayer('near', b, proj, minPx(), areaLod, t('near'), gridPx());
     const layers = [near];
     if (farB) {
       $('area-status').textContent = t('loadingDemFar');

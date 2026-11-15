@@ -25,7 +25,7 @@ with sync_playwright() as p:
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.route("**/api3.geo.admin.ch/**", geo); pg.route("**/photon.komoot.io/**", ph)
     u = f"http://127.0.0.1:{srv.server_port}/"
-    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear()"); pg.goto(u); pg.wait_for_timeout(1500)
+    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear(); localStorage.setItem('buildings3d','false')"); pg.goto(u); pg.wait_for_timeout(1500)
     pg.click("#sbtn"); pg.fill("#sq", "Glärnisch"); pg.wait_for_selector("#sres li")
     print("Treffer CH:", pg.inner_text("#sres").replace("\n", " | "))
     pg.keyboard.press("Enter"); pg.wait_for_timeout(500)

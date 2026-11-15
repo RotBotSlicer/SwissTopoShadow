@@ -124,10 +124,10 @@ export class MapView {
   }
 
   /** Boden-Punkte unter einem Raster von Bildschirmpunkten (Zeilen yFrom..yTo als Anteil der Höhe). */
-  _footprint(yFrom, yTo, maxDistM = 120000) {
+  _footprint(yFrom, yTo, maxDistM = 120000, n = 8) {
     const m = this.map, cv = m.getCanvas(), w = cv.clientWidth, h = cv.clientHeight, c = m.getCenter(), pts = [];
-    for (let j = 0; j <= 8; j++) for (let i = 0; i <= 8; i++) {
-      const p = m.unproject([w * i / 8, h * (yFrom + (yTo - yFrom) * j / 8)]);
+    for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+      const p = m.unproject([w * i / n, h * (yFrom + (yTo - yFrom) * j / n)]);
       if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
       if (c.distanceTo(p) > maxDistM) continue;
       pts.push(p);
@@ -138,9 +138,17 @@ export class MapView {
     return { south: Math.min(...pts.map(p => p.lat)), north: Math.max(...pts.map(p => p.lat)), west: Math.min(...pts.map(p => p.lng)), east: Math.max(...pts.map(p => p.lng)) };
   }
   /** 3D: feiner Bereich = Boden unter der unteren Bildhälfte (nahe Kamera). */
-  nearBounds() {
+  /** 3D: feiner Bereich = sichtbarer Boden bis reachM hinter dem unteren Bildrand (mindestens die untere Bildhälfte). */
+  nearBounds(reachM = 2500) {
     if (!this.is3D || this.map.getPitch() < 1) return this.viewBounds();
-    const pts = this._footprint(0.5, 1);
+    const m = this.map, cv = m.getCanvas(), ref = m.unproject([cv.clientWidth / 2, cv.clientHeight]);
+    const all = this._footprint(0, 1, 150000, 16);
+    const pts = all.filter(p => ref.distanceTo(p) <= reachM);
+    pts.push(...this._footprint(0.5, 1));
+    // Boden zwischen Kamera und unterem Bildrand: dort ragen oft Hügel ins Bild, die unproject (noch grobes
+    // Gelände) nicht trifft – darum den Ort unter der Kamera mit einschliessen.
+    const cam = m.transform.getCameraLngLat?.();
+    if (cam && Number.isFinite(cam.lat)) pts.push(cam);
     return pts.length > 3 ? MapView._bbox(pts) : this.viewBounds();
   }
   /** 3D: grober Bereich = ganzer sichtbarer Boden bis zum Horizont, höchstens ±halfM um die Mitte von near. */

@@ -11,7 +11,7 @@ with sync_playwright() as p:
     pg = b.new_page(viewport={"width": 420, "height": 800}, locale="de-CH"); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     u = f"http://127.0.0.1:{srv.server_port}/"
-    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear()"); pg.goto(u); pg.wait_for_timeout(1500)
+    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear(); localStorage.setItem('buildings3d','false')"); pg.goto(u); pg.wait_for_timeout(1500)
     assert pg.inner_text("#reg-world") == "Weltweit"
     pg.evaluate("__app.setView(47.0405, 9.0680, 14)"); pg.wait_for_timeout(500)
     pg.evaluate("__app.showPoint(47.0405, 9.0680)")

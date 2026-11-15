@@ -18,7 +18,7 @@ with sync_playwright() as p:
     pg = b.new_page(viewport={"width": 900, "height": 700}, locale="de-CH"); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     u = f"http://127.0.0.1:{srv.server_port}/"
-    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear()"); pg.goto(u); pg.wait_for_timeout(1500)
+    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear(); localStorage.setItem('buildings3d','false')"); pg.goto(u); pg.wait_for_timeout(1500)
     pg.fill("#date", "2026-11-14"); pg.dispatch_event("#date", "change")
     import sys
     view = sys.argv[1] if len(sys.argv) > 1 else "glarus"

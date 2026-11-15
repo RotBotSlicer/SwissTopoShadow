@@ -12,7 +12,7 @@ with sync_playwright() as p:
     pg = b.new_page(viewport={"width": 1000, "height": 760}, locale="de-CH"); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     u = f"http://127.0.0.1:{srv.server_port}/"
-    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear()"); pg.goto(u); pg.wait_for_timeout(1500)
+    pg.goto(u); pg.wait_for_timeout(1500); pg.evaluate("localStorage.clear(); localStorage.setItem('buildings3d','false')"); pg.goto(u); pg.wait_for_timeout(1500)
     pg.evaluate("__app.setView(46.9682, 9.0062, 14)"); pg.wait_for_timeout(1500)
     pg.click("#area"); pg.wait_for_function(done, timeout=900000)
     print("2D gerechnet:", pg.inner_text("#area"), "| Umrisse:", pg.evaluate("__app.mv.map.getSource('outline').serialize().data.features.length"))

@@ -41,25 +41,24 @@ export class Buildings {
     this._apply();
   }
 
-  /** Sonnenstand (geografisch: az ab Nord im Uhrzeigersinn, el über Horizont, Grad) für die Beleuchtung der Häuser.
-   *  shadows: Häuser werfen Schatten auf Häuser (deck.gl, experimentell). */
-  setSun(az, el, { shadows = false } = {}) { // Haus-auf-Haus-Schatten: in der Karte (interleaved) bisher ohne Wirkung
-    this.sun = { az, el, shadows };
+  /** Sonnenstand (geografisch: az ab Nord im Uhrzeigersinn, el über dem Horizont, Grad) für die Beleuchtung der Häuser. */
+  setSun(az, el) {
+    this.sun = { az, el };
     this._applyLight();
   }
 
   _applyLight() {
     if (!this.overlay || !this.light || !this.sun) return;
-    const { LightingEffect, AmbientLight, DirectionalLight } = this.light, { az, el, shadows } = this.sun;
-    const r = Math.PI / 180, up = Math.max(0, Math.sin(el * r));
-    // Licht fällt von der Sonne her ein: x Ost, y Nord, z oben
-    const dir = [-Math.sin(az * r) * Math.cos(el * r), -Math.cos(az * r) * Math.cos(el * r), -Math.sin(Math.max(el, 0.5) * r)];
-    const day = Math.min(1, up / Math.sin(10 * r)); // tiefe Sonne: weniger direktes Licht
+    const { LightingEffect, AmbientLight, DirectionalLight } = this.light, { az, el } = this.sun;
+    const r = Math.PI / 180, day = Math.min(1, Math.max(0, Math.sin(el * r)) / Math.sin(10 * r)); // tiefe Sonne: weniger direktes Licht
+    // Richtung ZUR Sonne (x Ost, y Nord, z oben). So wirkt sie in der Karte (MapLibre + deck.gl, interleaved) richtig:
+    // im Test hellt [0, -1, ·] die Südfassaden auf und [0, 0, 1] die Dächer. (Die SunLight von deck.gl zeigte hier verkehrt.)
+    const e = Math.max(el, 0.5) * r, a = az * r;
     const effect = new LightingEffect({
       sky: new AmbientLight({ color: [235, 240, 255], intensity: 0.4 + 0.2 * day }),
-      sun: new DirectionalLight({ color: [255, 244, 225], intensity: el > -0.8 ? 0.6 + 2.6 * day : 0, direction: dir, _shadow: shadows && el > 0 }),
+      sun: new DirectionalLight({ color: [255, 244, 225], intensity: el > -0.8 ? 0.6 + 2.6 * day : 0,
+        direction: [Math.sin(a) * Math.cos(e), Math.cos(a) * Math.cos(e), Math.sin(e)] }),
     });
-    effect.shadowColor = [0, 0, 0, 0.45];
     this.overlay.setProps({ effects: [effect] });
   }
 

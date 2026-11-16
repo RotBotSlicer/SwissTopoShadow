@@ -551,6 +551,7 @@ function draw() {
     TZ = area.tz;
     for (const L of area.layers) { const t = L.suns[i]; L.renderer.renderShadow(t.az, t.el, { rMax: R_MAX, grad: t.grad }); }
     mv.overlayChanged();
+    updateBuildingSun();
     selectedMinute = (s.u - dayStart($('date').value)) / 60;
     $('timelbl').textContent = fmtTime(s.u);
     if (pointTerrain) { const tz = TZ; markProfile(s.u); TZ = tz; }
@@ -590,12 +591,20 @@ $('mode').onchange = draw;
 $('surface').checked = store.get('surface') ?? true;
 // 3D-Gebäude (Prototyp): nur Schweiz und nur in 3D; Bibliothek wird erst beim Einschalten geladen
 var buildings = null; // var: applyRegion ruft applyBuildings schon vor dieser Zeile auf
+/** Häuser nach dem Sonnenstand beleuchten: Zeit der Zeitleiste (sonst gewählte Minute bzw. Mittag) an der Kartenmitte. */
+function updateBuildingSun() {
+  if (!buildings?.on) return;
+  const i = +$('time').value, s = area && suns[i];
+  const u = s ? s.u : dayStart($('date').value) + 60 * (selectedMinute ?? 12 * 60);
+  const c = mv.center(), p = sunPosition(u, c.lat, c.lon);
+  buildings.setSun(p.az, p.el);
+}
 async function applyBuildings() {
   $('bld-row').hidden = !(isCH() && mv.is3D);
   const want = $('bld').checked && isCH() && mv.is3D;
   if (!want && !buildings) return;
   if (!buildings) { const { Buildings } = await import('./buildings3d.js'); buildings ??= new Buildings(mv.map); }
-  try { await buildings.set(want); } catch (e) { console.error(e); status(t('error', { m: e.message })); }
+  try { await buildings.set(want); updateBuildingSun(); } catch (e) { console.error(e); status(t('error', { m: e.message })); }
 }
 $('bld').checked = store.get('buildings3d') ?? true;
 $('bld').onchange = () => { store.set('buildings3d', $('bld').checked); applyBuildings(); };

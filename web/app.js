@@ -127,9 +127,11 @@ async function showPoint(lat, lon) {
   expand();
   try {
     let terrain = area?.terrain;
+    const key = `${lat},${lon},${region},${surfaceOn()}`;
+    if (ptCache?.key === key) terrain = ptCache.terrain; // gleicher Punkt (z. B. nur Höhe geändert): nicht neu laden
     // Gelände des Ausschnitts nur wiederverwenden, wenn es das feine 2-m-Modell ohne Oberfläche ist
     // (mit Wald lädt der Punkt die Oberfläche zusätzlich in 1 m)
-    const inArea = terrain && isCH() && !surfaceOn() && area.lod === LOD_DEFAULT && E > area.grid.bboxLv95[0] && E < area.grid.bboxLv95[2] && N > area.grid.bboxLv95[1] && N < area.grid.bboxLv95[3];
+    const inArea = ptCache?.key === key || terrain && isCH() && !surfaceOn() && area.lod === LOD_DEFAULT && E > area.grid.bboxLv95[0] && E < area.grid.bboxLv95[2] && N > area.grid.bboxLv95[1] && N < area.grid.bboxLv95[3];
     if (!inArea) {
       status(t('loadingPoint'));
       if (isCH()) {
@@ -139,8 +141,9 @@ async function showPoint(lat, lon) {
         terrain = await loadTerrainWorld([E - 50, N - 50, E + 50, N + 50], proj, { rMax: R_MAX });
       }
     }
+    ptCache = { key, terrain };
     const az = Array.from({ length: 1440 }, (_, i) => i * 0.25);
-    const det = pointHorizonDetail(terrain, E, N, az, { eye: 1.7, rMax: R_MAX });
+    const det = pointHorizonDetail(terrain, E, N, az, { eye: eyeHeight(), rMax: R_MAX });
     const h = det.h;
     // Was bestimmt den Horizont? 0 Gelände, 1 Wald/Bäume, 2 Gebäude (nur mit Oberflächenmodell)
     const cls = new Uint8Array(az.length);
@@ -158,6 +161,15 @@ async function showPoint(lat, lon) {
   } catch (e) { console.error(e); status('Fehler: ' + e.message); }
 }
 
+// Beobachterhöhe über dem Boden (Gelände ohne Wald/Gebäude), z. B. 1.7 m stehend, 10 m Balkon, 25 m über den Baumkronen
+var ptCache = null; // var: wird in showPoint (weiter oben) verwendet
+const eyeHeight = () => { const v = parseFloat($('eye').value); return Number.isFinite(v) && v >= 0 ? Math.min(v, 500) : 1.7; };
+$('eye').value = store.get('eye') ?? 1.7;
+$('eye').onchange = () => {
+  $('eye').value = eyeHeight(); store.set('eye', eyeHeight());
+  if (pointTerrain) showPoint(pointTerrain.lat, pointTerrain.lon);
+};
+
 function renderPoint() {
   if (!pointTerrain) return;
   const { E, N, lat, lon, proj, az, h, z } = pointTerrain, day = $('date').value;
@@ -172,7 +184,7 @@ function renderPoint() {
   $('ivs').innerHTML = intervals(times, lit).map(([a, b]) => `☀︎ ${fmtTime(a)} – ${fmtTime(b)}`).join('<br>');
   const cp = pointTerrain.canopy;
   $('canopy').textContent = !isCH() ? t('copNote') : cp == null ? t('noSurface')
-    : cp > 3 ? t('underCanopy', { h: Math.round(cp) }) : t('withSurface');
+    : cp > 3 ? (eyeHeight() > cp ? t('aboveCanopy', { h: Math.round(cp) }) : t('underCanopy', { h: Math.round(cp) })) : t('withSurface');
   $('psum').textContent = `${$('summary').textContent} · ${intervals(times, lit).map(([a, b]) => `${fmtTime(a)}–${fmtTime(b)}`).join(', ') || '–'}`;
   drawChart(az, h, times, E, N, lit, proj, pointTerrain);
 }

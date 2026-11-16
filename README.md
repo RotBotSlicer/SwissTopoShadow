@@ -5,6 +5,7 @@ Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhen
 - **Sprache:** Deutsch/Englisch unten rechts (DE · EN), Voreinstellung nach Browsersprache.
 - **Suche (Lupe oben links):** Orte, Berge, Hütten und Adressen. Schweiz über die Suche von geo.admin.ch (swissNAMES3D),
   sonst weltweit über Photon (OpenStreetMap); ein Treffer ausserhalb der Schweiz schaltet auf „Weltweit“.
+- **Höhe über Boden** (beim Punkt, Standard 1.7 m): z. B. Balkon oder Blick über die Baumkronen; bezieht sich auf das Gelände ohne Wald/Gebäude.
 - **Ort antippen:** Sonnenzeiten am Punkt. Profil oben über der Karte (Schalter „Profil“): Horizont, Sonnenbahn des
   gewählten Tages sowie des längsten und kürzesten Tages; beim Zeitschieber zeigt ein Kreis den aktuellen Sonnenstand.
   Auf der Südhalbkugel ist Norden in der Mitte. Zoomen mit zwei Fingern (Mausrad), verschieben mit einem Finger,

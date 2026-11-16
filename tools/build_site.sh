@@ -14,6 +14,7 @@ cp -r web/app.js web/mapview.js web/i18n.js web/buildings3d.js web/app.css web/v
 cp -r js/src "_site/v/$VER/lib"
 sed -e "s#\./vendor/#./v/$VER/vendor/#g" -e "s#\./app\.css#./v/$VER/app.css#g" -e "s#\./app\.js#./v/$VER/app.js#g" \
     -e "s#__VERSION__#$VER#g" web/index.html > _site/index.html
+cp web/hilfe.html _site/hilfe.html
 cp -r data/pyramid _site/data/pyramid
 [ -d web/proto3d ] && cp -r web/proto3d _site/proto3d  # 3D-Prototypen (fester Ort)
 touch _site/.nojekyll

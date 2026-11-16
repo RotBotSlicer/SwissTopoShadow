@@ -79,8 +79,8 @@ function applyRegion() {
   $('reg-ch').setAttribute('aria-checked', String(isCH())); $('reg-world').setAttribute('aria-checked', String(!isCH()));
   $('surface-row').hidden = !isCH(); $('trails-row').hidden = !isCH(); if (typeof applyBuildings === 'function') applyBuildings(); $('world-note').hidden = isCH();
   $('credits').innerHTML = isCH()
-    ? `${t('creditsCH')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`
-    : `${t('creditsWorld')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`;
+    ? `<a href="./hilfe.html">${t('helpLink')}</a> · ${t('noWarranty')} · ${t('creditsCH')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`
+    : `<a href="./hilfe.html">${t('helpLink')}</a> · ${t('noWarranty')} · ${t('creditsWorld')} · <a href="https://github.com/RotBotSlicer/SwissTopoShadow">Code</a> · Version ${VERSION}`;
   updateAreaButton();
 }
 function setRegion(r) {

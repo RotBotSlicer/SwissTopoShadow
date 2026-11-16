@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hilfe, Datenschutz & Impressum – bergschatten.ch</title>
+<style>
+  :root { --fg:#1f2a24; --mut:#5d6a62; --line:#dcdcd4; --acc:#c95a1a; --bg:#f6f5f0; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color:var(--fg); background:var(--bg); }
+  header { position:sticky; top:0; background:rgba(246,245,240,.95); backdrop-filter:blur(6px); border-bottom:1px solid var(--line); z-index:2; }
+  .bar { max-width:780px; margin:0 auto; padding:10px 18px; display:flex; align-items:center; gap:12px; }
+  .bar a.back { text-decoration:none; color:var(--acc); font-weight:600; }
+  .bar .sp { flex:1; }
+  .lang button { border:0; background:none; padding:0 4px; font:inherit; color:var(--mut); cursor:pointer; }
+  .lang button[aria-pressed="true"] { color:var(--fg); font-weight:700; text-decoration:underline; }
+  main { max-width:780px; margin:0 auto; padding:8px 18px 60px; }
+  nav.toc { margin:14px 0 6px; display:flex; flex-wrap:wrap; gap:6px 14px; font-size:.95rem; }
+  nav.toc a { color:var(--acc); }
+  h1 { font-size:1.6rem; margin:18px 0 4px; }
+  h2, h3 { scroll-margin-top:60px; }
+  h2 { font-size:1.25rem; margin:34px 0 8px; padding-top:8px; border-top:1px solid var(--line); }
+  h3 { font-size:1.05rem; margin:20px 0 6px; }
+  dl { margin:0; } dt { font-weight:650; margin-top:12px; } dd { margin:2px 0 0 0; }
+  .note { background:#fff; border:1px solid var(--line); border-left:4px solid var(--acc); border-radius:8px; padding:10px 14px; margin:14px 0; }
+  .mut { color:var(--mut); } small { color:var(--mut); }
+  ul { padding-left:1.2em; } li { margin:3px 0; }
+  table { border-collapse:collapse; width:100%; font-size:.93rem; } td, th { text-align:left; border-bottom:1px solid var(--line); padding:6px 6px 6px 0; vertical-align:top; }
+  [hidden] { display:none !important; }
+  .sw { display:inline-block; width:12px; height:10px; border-radius:2px; vertical-align:middle; margin-right:3px; }
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <a class="back" href="./" id="back">← bergschatten.ch</a><span class="sp"></span>
+  <span class="lang"><button id="l-de">DE</button>·<button id="l-en">EN</button></span>
+</div></header>
+
+<!-- ======================================================================= DEUTSCH -->
+<main lang="de" id="de">
+<h1>Hilfe & Hintergrund</h1>
+<p class="mut">bergschatten.ch zeigt, wann die Sonne an einem Ort direkt scheint und wie die Schatten von Bergen, Wald und Gebäuden über den Tag wandern.</p>
+<nav class="toc"><a href="#de-start">Erste Schritte</a><a href="#de-settings">Einstellungen</a><a href="#de-profile">Profil</a><a href="#de-3d">3D</a><a href="#de-basics">Grundlagen</a><a href="#de-limits">Genauigkeit</a><a href="#de-sources">Datenquellen</a><a href="#de-privacy">Datenschutz</a><a href="#de-legal">Haftung & Impressum</a></nav>
+
+<h2 id="de-start">Erste Schritte</h2>
+<ol>
+  <li><b>Ort wählen:</b> Karte verschieben, oben links über die Lupe suchen oder mit ◎ zum eigenen Standort springen.</li>
+  <li><b>Punkt antippen:</b> Die App rechnet für diesen Punkt die Sonnenzeiten des gewählten Tages und zeigt das Horizontprofil.</li>
+  <li><b>Schatten für den Ausschnitt:</b> Mit dem orangen Knopf rechnet die App den Schatten für den sichtbaren Kartenausschnitt. Mit der Zeitleiste oder ▶ fährst du durch den Tag.</li>
+</ol>
+
+<h2 id="de-settings">Einstellungen</h2>
+<dl>
+  <dt>Schweiz / Weltweit</dt>
+  <dd>Schweiz: Höhendaten und Karten von swisstopo, bis 2 m genau, mit Wald und Gebäuden. Weltweit: offene Copernicus-Höhendaten (30 m) und OpenTopoMap – überall verfügbar, aber gröber.</dd>
+  <dt>Karte / Luftbild</dt>
+  <dd>Hintergrund: Landeskarte bzw. Luftbild (Schweiz) oder OpenTopoMap (weltweit).</dd>
+  <dt>3D</dt>
+  <dd>Gelände in 3D, Bedienung siehe <a href="#de-3d">3D</a>.</dd>
+  <dt>Datum, Heute</dt>
+  <dd>Der Tag, für den gerechnet wird. Die Uhrzeiten gelten in der Zeitzone des Ortes.</dd>
+  <dt>◎ (Standort)</dt>
+  <dd>Springt zu deinem Standort (der Browser fragt um Erlaubnis). Der Standort wird nur im Browser verwendet.</dd>
+  <dt>Profil</dt>
+  <dd>Blendet das Horizontprofil des gewählten Punktes ein oder aus.</dd>
+  <dt>Schatten · … (oranger Knopf)</dt>
+  <dd>Rechnet den Schatten für den sichtbaren Ausschnitt. Die Beschriftung zeigt die Genauigkeit (z. B. „2 m + Wald“). Steht „Ansicht geändert ↻“, deckt die Rechnung die aktuelle Ansicht nicht mehr ganz ab – nochmals tippen. Bei sehr grossen Ausschnitten muss man zuerst näher zoomen.</dd>
+  <dt>Anzeige: Schatten / Sonnenstunden</dt>
+  <dd>Schatten zur gewählten Uhrzeit, oder die Summe der direkten Sonnenstunden über den ganzen Tag (Farbskala von dunkelblau = keine bis orange = viele).</dd>
+  <dt>Wald und Gebäude</dt>
+  <dd>Rechnet mit dem Oberflächenmodell swissSURFACE3D, d. h. Bäume und Häuser werfen Schatten. Nur in der Schweiz und nur bei feinem Gelände (nah herangezoomt); sonst nur Gelände.</dd>
+  <dt>Wanderwege</dt>
+  <dd>Blendet die Wanderwege von swisstopo über Karte und Luftbild ein oder aus.</dd>
+  <dt>3D-Gebäude</dt>
+  <dd>Zeigt in 3D die Gebäude von swissBUILDINGS3D (nur Schweiz). Das ist nur die Darstellung – die Hausschatten kommen aus „Wald und Gebäude“.</dd>
+  <dt>Höhe über Boden (beim Punkt)</dt>
+  <dd>Augenhöhe des Beobachters über dem Boden (ohne Bäume und Häuser): 1.7 m stehend, z. B. 10 m für einen Balkon oder 30 m, um über Baumkronen zu schauen.</dd>
+  <dt>DE · EN</dt>
+  <dd>Sprache der App (unten in der Fusszeile).</dd>
+</dl>
+<p class="mut">Alle Einstellungen bleiben in deinem Browser gespeichert (siehe <a href="#de-privacy">Datenschutz</a>).</p>
+
+<h2 id="de-profile">Das Profil</h2>
+<p>Das Profil zeigt rundum den Horizont, wie man ihn vom Punkt aus sieht (Himmelsrichtung waagrecht, Höhenwinkel senkrecht), und darüber die Sonnenbahn:</p>
+<ul>
+  <li><b>orange:</b> Sonnenbahn am gewählten Tag mit Stundenmarken; Punkte = direkte Sonne.</li>
+  <li><b>gelb gestrichelt / blau gestrichelt:</b> längster bzw. kürzester Tag des Jahres.</li>
+  <li><span class="sw" style="background:#9b9d96"></span><b>grau:</b> Gelände, <span class="sw" style="background:#5f9a4e"></span><b>grün:</b> was Wald oder Bäume zusätzlich verdecken, <span class="sw" style="background:#c8473a"></span><b>rot:</b> was Gebäude zusätzlich verdecken (nur mit „Wald und Gebäude“, im Umkreis von 1 km).</li>
+  <li><b>Zoomen:</b> mit zwei Fingern oder Mausrad, mit einem Finger verschieben; Doppeltipp oder ⟲ zeigt wieder alles.</li>
+</ul>
+
+<h2 id="de-3d">3D-Ansicht</h2>
+<ul>
+  <li><b>Knöpfe rechts:</b> ↶ ↷ drehen, ˄ zum Horizont kippen, ˅ mehr von oben. Tippen = ein Schritt, gedrückt halten = fortlaufend.</li>
+  <li><b>Handy:</b> zwei Finger drehen bzw. gemeinsam nach oben/unten schieben zum Kippen.</li>
+  <li><b>Mac-Trackpad:</b> zwei Finger drehen; ⇧ Umschalt + scrollen kippt, ⌥ Option + scrollen dreht.</li>
+  <li><b>Schatten in 3D:</b> vorne fein (2–3 m, mit Wald und Gebäuden, bis etwa 2.5 km), dahinter grob bis zum Horizont (nur Gelände). Die gestrichelte Linie zeigt die äussere Grenze des gerechneten Bereichs.</li>
+</ul>
+
+<h2 id="de-basics">Grundlagen der Berechnung</h2>
+<h3>Sonnenstand</h3>
+<p>Für jede Minute wird die Position der Sonne (Richtung und Höhe) mit dem Algorithmus der US-Behörde NOAA berechnet, inklusive der Lichtbrechung in der Atmosphäre. Die Sonne gilt als aufgegangen, wenn ihr oberer Rand über dem Horizont steht (scheinbare Höhe −0.833°).</p>
+<h3>Horizont</h3>
+<p>Vom Beobachter aus wird in alle Richtungen (alle 0.25°) ein Strahl über das Höhenmodell geführt, bis 30 km weit. Für jede Richtung zählt der steilste Winkel zu einem Hindernis. Berücksichtigt werden die Erdkrümmung und die Lichtbrechung (Refraktionskoeffizient 0.13). In der Nähe wird fein (1–2 m), weiter weg zunehmend gröber gerechnet.</p>
+<h3>Schattenkarte</h3>
+<p>Für jedes Pixel des Ausschnitts prüft die Grafikkarte (WebGL), ob ein Strahl Richtung Sonne frei ist. „Sonnenstunden“ zählt das für jeden 5-Minuten-Schritt des Tages zusammen.</p>
+<h3>Kartennord und Meridiankonvergenz</h3>
+<p>Die Schweizer Koordinaten (LV95) sind nicht genau nach geografisch Nord ausgerichtet (in Glarus etwa 1.1°). Die Sonnenrichtung wird deshalb in das Koordinatengitter umgerechnet – ohne diese Korrektur lägen Schattenzeiten mehrere Minuten daneben.</p>
+
+<h2 id="de-limits">Genauigkeit und Grenzen</h2>
+<ul>
+  <li>Gerechnet wird nur <b>direkte Sonne</b> – keine Wolken, kein Nebel, kein Streulicht.</li>
+  <li>Schweiz: Gelände 2 m (swissALTI3D), weiter weg 10–160 m. Im Vergleich zur vollen 2-m-Rechnung stimmen bei 10 m rund 98 % der Schattenpixel überein.</li>
+  <li>Wald und Gebäude stammen aus Laserscanning-Daten mit einem bestimmten Aufnahmedatum; gefällte Bäume oder neue Häuser fehlen bzw. sind noch drin. Laubbäume werden im Winter wie im Sommer als undurchsichtig behandelt.</li>
+  <li>Weltweit (Copernicus, 30 m) liegen die Zeiten in offenem Gelände meist wenige Minuten daneben, in engen Tälern und Schluchten auch 30 Minuten und mehr. Das Modell enthält Wald und Gebäude nur grob.</li>
+  <li>Die Ergebnisse sind Berechnungen und können von der Wirklichkeit abweichen – siehe <a href="#de-legal">Haftung</a>.</li>
+</ul>
+
+<h2 id="de-sources">Datenquellen und Lizenzen</h2>
+<table>
+  <tr><th>Daten</th><th>Quelle / Lizenz</th></tr>
+  <tr><td>Höhenmodelle swissALTI3D, swissALTIRegio, Oberflächenmodell swissSURFACE3D, Gebäude swissBUILDINGS3D, Landeskarten, Luftbild SWISSIMAGE, Wanderwege, Ortssuche</td><td>© swisstopo (Bundesamt für Landestopografie), Open Government Data</td></tr>
+  <tr><td>Gebäudegrundrisse für die Einfärbung im Profil (Eignung von Hausdächern)</td><td>© BFE (Bundesamt für Energie), swisstopo</td></tr>
+  <tr><td>Weltweites Höhenmodell</td><td>Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30. – Bereitgestellt über OpenTopography.</td></tr>
+  <tr><td>Weltweite Karte</td><td>© OpenTopoMap (CC-BY-SA), Kartendaten © OpenStreetMap-Mitwirkende (ODbL), SRTM</td></tr>
+  <tr><td>Weltweite Ortssuche</td><td>Photon von komoot, Daten © OpenStreetMap-Mitwirkende</td></tr>
+  <tr><td>Software</td><td>MapLibre GL JS (BSD-3), deck.gl und loaders.gl (MIT), geotiff.js (MIT), tz-lookup (CC0); eigener Code: <a href="https://github.com/RotBotSlicer/SwissTopoShadow">github.com/RotBotSlicer/SwissTopoShadow</a></td></tr>
+</table>
+
+<h2 id="de-privacy">Datenschutz</h2>
+<p><b>Kurz:</b> bergschatten.ch hat kein Benutzerkonto, setzt keine Cookies, keine Werbung, keine Statistik- oder Tracking-Werkzeuge. Es gibt keinen eigenen Server, der Daten über dich sammelt.</p>
+<h3>Verantwortlich</h3>
+<p id="de-resp">Michael Wüthrich, 8482 Sennhof, Schweiz · <a href="mailto:info@bergschatten.ch">info@bergschatten.ch</a></p>
+<h3>Was im Browser gespeichert wird</h3>
+<p>Damit die App beim nächsten Öffnen so aussieht wie zuletzt, speichert sie im lokalen Speicher deines Browsers (localStorage): Sprache, Gebiet, Hintergrund, Kartenausschnitt, zuletzt gewählter Punkt, Datum, Höhe über Boden sowie die Schalter (Profil, Wald und Gebäude, Wanderwege, 3D-Gebäude). Diese Angaben bleiben auf deinem Gerät, werden nicht übertragen und lassen sich über die Browsereinstellungen („Websitedaten löschen“) entfernen. Sie dienen nur der von dir gewünschten Funktion; deshalb ist keine Einwilligung („Cookie-Banner“) nötig.</p>
+<h3>Hosting</h3>
+<p>Die Seite liegt bei GitHub Pages (GitHub Inc., USA). Beim Aufruf erhält GitHub technisch notwendig deine IP-Adresse und speichert sie gemäss seiner Datenschutzerklärung aus Sicherheitsgründen. Siehe <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement">GitHub-Datenschutzerklärung</a>.</p>
+<h3>Daten von Drittanbietern</h3>
+<p>Karten, Höhendaten und Suche lädt dein Browser direkt von den jeweiligen Anbietern. Diese sehen dabei deine IP-Adresse und welchen Kartenausschnitt bzw. welchen Suchbegriff du abfragst:</p>
+<ul>
+  <li>swisstopo / geo.admin.ch (Schweiz) – Karten, Luftbilder, Höhendaten, Gebäude, Suche</li>
+  <li>OpenTopography / San Diego Supercomputer Center (USA) – weltweite Höhendaten</li>
+  <li>OpenTopoMap (Deutschland) – weltweite Karte</li>
+  <li>komoot (Photon, Deutschland) – weltweite Suche, nur wenn die Schweizer Suche nichts findet oder „Weltweit“ gewählt ist</li>
+</ul>
+<p>Es gelten die Datenschutzbestimmungen dieser Anbieter. Die Bekanntgabe ist für die Funktion der App nötig. Ein Teil der Anbieter sitzt in den USA, wo das Datenschutzniveau nicht demjenigen der Schweiz entspricht.</p>
+<h3>Standort</h3>
+<p>Nur wenn du auf ◎ tippst, fragt der Browser nach deinem Standort. Er wird ausschliesslich im Browser verwendet, um die Karte zu verschieben, und nicht gespeichert oder an bergschatten.ch übermittelt (die Kartenanbieter sehen wie oben nur den angezeigten Ausschnitt).</p>
+<h3>Deine Rechte</h3>
+<p>Du kannst Auskunft über Daten verlangen, die über dich bearbeitet werden, sowie deren Berichtigung oder Löschung. Da bergschatten.ch selbst keine Personendaten speichert, betrifft dies in der Praxis vor allem die oben genannten Anbieter. Kontakt siehe oben.</p>
+
+<h2 id="de-legal">Haftungsausschluss & Impressum</h2>
+<div class="note"><b>Nicht für Sicherheitsentscheidungen.</b> bergschatten.ch ist ein privates Hobbyprojekt. Alle Angaben erfolgen ohne Gewähr für Richtigkeit, Vollständigkeit, Aktualität oder Verfügbarkeit. Verlasse dich bei Planung und Durchführung von Touren, insbesondere im Gebirge (z. B. Schnee- und Lawinenverhältnisse, Vereisung, Steinschlag, Rückkehr bei Tageslicht), nicht auf diese Seite, sondern auf offizielle Informationen und dein eigenes Urteil.</div>
+<p>Alle Darstellungen und berechneten Werte (Sonnenzeiten, Schatten, Sonnenstunden, Profile) sind <b>modellhafte Näherungen</b> auf Grundlage von Höhendaten Dritter. Sie können falsch, unvollständig oder veraltet sein, etwa wegen Fehlern oder Lücken in den Daten, Vereinfachungen in der Berechnung, Programmfehlern oder Störungen der Datenquellen. Die Nutzung erfolgt <b>auf eigenes Risiko</b>; Entscheidungen triffst du selbst und in eigener Verantwortung.</p>
+<p>Jede Haftung für Schäden – insbesondere für Personen-, Sach- und Vermögensschäden –, die direkt oder indirekt aus der Nutzung oder Nichtnutzung dieser Seite, aus falschen, unvollständigen oder missverstandenen Ergebnissen oder aus deren Nichtverfügbarkeit entstehen, wird ausgeschlossen, soweit dies gesetzlich zulässig ist. Es besteht kein Anspruch auf Verfügbarkeit oder Weiterentwicklung der Seite. Für Inhalte und Daten Dritter (Karten, Höhendaten, Suche) sind deren Anbieter verantwortlich.</p>
+<p>Die Organisationen, die von Gesetzes wegen oder im Auftrag für das Copernicus-Programm zuständig sind, haften nicht für die Verwendung von Copernicus WorldDEM-30.</p>
+<h3>Impressum</h3>
+<p id="de-imp">Verantwortlich für Inhalt und Betrieb:<br>Michael Wüthrich<br>8482 Sennhof<br>Schweiz<br>E-Mail: <a href="mailto:info@bergschatten.ch">info@bergschatten.ch</a><br>Privates, nicht-kommerzielles Projekt.</p>
+<p class="mut"><small>Stand: November 2026</small></p>
+</main>
+
+<!-- ======================================================================= ENGLISH -->
+<main lang="en" id="en" hidden>
+<h1>Help & background</h1>
+<p class="mut">bergschatten.ch shows when the sun shines directly on a place and how the shadows of mountains, forest and buildings move through the day.</p>
+<nav class="toc"><a href="#en-start">Getting started</a><a href="#en-settings">Settings</a><a href="#en-profile">Profile</a><a href="#en-3d">3D</a><a href="#en-basics">How it works</a><a href="#en-limits">Accuracy</a><a href="#en-sources">Data sources</a><a href="#en-privacy">Privacy</a><a href="#en-legal">Disclaimer & imprint</a></nav>
+
+<h2 id="en-start">Getting started</h2>
+<ol>
+  <li><b>Choose a place:</b> pan the map, search with the magnifier (top left) or jump to your location with ◎.</li>
+  <li><b>Tap a point:</b> the app computes the sun times for that point on the selected day and shows the horizon profile.</li>
+  <li><b>Shadows for the view:</b> the orange button computes the shadows for the visible map area. Use the time slider or ▶ to move through the day.</li>
+</ol>
+
+<h2 id="en-settings">Settings</h2>
+<dl>
+  <dt>Switzerland / Worldwide</dt>
+  <dd>Switzerland: swisstopo elevation data and maps, down to 2 m, including forest and buildings. Worldwide: open Copernicus elevation data (30 m) and OpenTopoMap – available everywhere, but coarser.</dd>
+  <dt>Map / Aerial</dt>
+  <dd>Background: national map or aerial imagery (Switzerland) or OpenTopoMap (worldwide).</dd>
+  <dt>3D</dt>
+  <dd>Terrain in 3D, see <a href="#en-3d">3D</a>.</dd>
+  <dt>Date, Today</dt>
+  <dd>The day to compute. Times are in the local time zone of the place.</dd>
+  <dt>◎ (location)</dt>
+  <dd>Jumps to your location (the browser asks for permission). The location is only used in your browser.</dd>
+  <dt>Profile</dt>
+  <dd>Shows or hides the horizon profile of the selected point.</dd>
+  <dt>Shadows · … (orange button)</dt>
+  <dd>Computes the shadows for the visible area. The label shows the resolution (e.g. “2 m + forest”). “View changed ↻” means the computed area no longer covers the whole view – tap again. For very large areas, zoom in first.</dd>
+  <dt>Display: Shadows / Sun hours</dt>
+  <dd>Shadows at the selected time, or the total hours of direct sun over the day (from dark blue = none to orange = many).</dd>
+  <dt>Forest and buildings</dt>
+  <dd>Uses the swissSURFACE3D surface model, so trees and houses cast shadows. Switzerland only and only for fine terrain (zoomed in); otherwise terrain only.</dd>
+  <dt>Hiking trails</dt>
+  <dd>Shows or hides the swisstopo hiking trails on map and aerial imagery.</dd>
+  <dt>3D buildings</dt>
+  <dd>Shows the swissBUILDINGS3D buildings in 3D (Switzerland only). Display only – building shadows come from “Forest and buildings”.</dd>
+  <dt>Height above ground (at the point)</dt>
+  <dd>Eye height above the ground (without trees and houses): 1.7 m standing, e.g. 10 m for a balcony or 30 m to look over the treetops.</dd>
+  <dt>DE · EN</dt>
+  <dd>Language of the app (in the footer).</dd>
+</dl>
+<p class="mut">All settings are kept in your browser (see <a href="#en-privacy">Privacy</a>).</p>
+
+<h2 id="en-profile">The profile</h2>
+<p>The profile shows the full horizon as seen from the point (direction horizontally, elevation angle vertically) and the sun path above it:</p>
+<ul>
+  <li><b>orange:</b> sun path on the selected day with hour marks; dots = direct sun.</li>
+  <li><b>yellow dashed / blue dashed:</b> longest and shortest day of the year.</li>
+  <li><span class="sw" style="background:#9b9d96"></span><b>grey:</b> terrain, <span class="sw" style="background:#5f9a4e"></span><b>green:</b> what forest or trees block in addition, <span class="sw" style="background:#c8473a"></span><b>red:</b> what buildings block in addition (only with “Forest and buildings”, within 1 km).</li>
+  <li><b>Zoom:</b> with two fingers or the mouse wheel, pan with one finger; double tap or ⟲ shows everything again.</li>
+</ul>
+
+<h2 id="en-3d">3D view</h2>
+<ul>
+  <li><b>Buttons on the right:</b> ↶ ↷ rotate, ˄ tilt toward the horizon, ˅ view more from above. Tap = one step, press and hold = continuous.</li>
+  <li><b>Phone:</b> rotate with two fingers, or move two fingers up/down to tilt.</li>
+  <li><b>Mac trackpad:</b> rotate with two fingers; ⇧ Shift + scroll tilts, ⌥ Option + scroll rotates.</li>
+  <li><b>Shadows in 3D:</b> fine up front (2–3 m, with forest and buildings, up to about 2.5 km), coarse behind up to the horizon (terrain only). The dashed line shows the outer limit of the computed area.</li>
+</ul>
+
+<h2 id="en-basics">How it works</h2>
+<h3>Sun position</h3>
+<p>For every minute, the sun’s position (direction and elevation) is computed with the NOAA algorithm, including atmospheric refraction. The sun counts as risen when its upper limb is above the horizon (apparent elevation −0.833°).</p>
+<h3>Horizon</h3>
+<p>From the observer, a ray is traced over the elevation model in every direction (every 0.25°) up to 30 km. For each direction the steepest angle to an obstacle counts. Earth curvature and refraction (coefficient 0.13) are taken into account. Close by the computation is fine (1–2 m), further away increasingly coarse.</p>
+<h3>Shadow map</h3>
+<p>For every pixel of the area, the graphics card (WebGL) checks whether a ray toward the sun is free. “Sun hours” adds this up for every 5-minute step of the day.</p>
+<h3>Grid north and meridian convergence</h3>
+<p>The Swiss coordinate grid (LV95) is not aligned exactly with true north (about 1.1° in Glarus). The sun direction is therefore converted into the grid – without this correction shadow times would be off by several minutes.</p>
+
+<h2 id="en-limits">Accuracy and limits</h2>
+<ul>
+  <li>Only <b>direct sun</b> is computed – no clouds, fog or diffuse light.</li>
+  <li>Switzerland: terrain 2 m (swissALTI3D), further away 10–160 m. Compared with a full 2 m computation, about 98 % of shadow pixels agree at 10 m.</li>
+  <li>Forest and buildings come from laser scanning on a given date; felled trees or new houses may be missing or still present. Deciduous trees are treated as opaque in winter as in summer.</li>
+  <li>Worldwide (Copernicus, 30 m), times in open terrain are usually a few minutes off, in narrow valleys and gorges 30 minutes or more. The model contains forest and buildings only roughly.</li>
+  <li>Results are computations and can differ from reality – see <a href="#en-legal">Disclaimer</a>.</li>
+</ul>
+
+<h2 id="en-sources">Data sources and licences</h2>
+<table>
+  <tr><th>Data</th><th>Source / licence</th></tr>
+  <tr><td>Elevation models swissALTI3D, swissALTIRegio, surface model swissSURFACE3D, buildings swissBUILDINGS3D, national maps, SWISSIMAGE aerial imagery, hiking trails, place search</td><td>© swisstopo (Federal Office of Topography), Open Government Data</td></tr>
+  <tr><td>Building footprints for the profile colours (roof suitability)</td><td>© SFOE (Swiss Federal Office of Energy), swisstopo</td></tr>
+  <tr><td>Worldwide elevation model</td><td>Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30. – Provided via OpenTopography.</td></tr>
+  <tr><td>Worldwide map</td><td>© OpenTopoMap (CC-BY-SA), map data © OpenStreetMap contributors (ODbL), SRTM</td></tr>
+  <tr><td>Worldwide place search</td><td>Photon by komoot, data © OpenStreetMap contributors</td></tr>
+  <tr><td>Software</td><td>MapLibre GL JS (BSD-3), deck.gl and loaders.gl (MIT), geotiff.js (MIT), tz-lookup (CC0); own code: <a href="https://github.com/RotBotSlicer/SwissTopoShadow">github.com/RotBotSlicer/SwissTopoShadow</a></td></tr>
+</table>
+
+<h2 id="en-privacy">Privacy</h2>
+<p><b>In short:</b> bergschatten.ch has no user accounts and uses no cookies, no advertising and no analytics or tracking tools. There is no own server collecting data about you.</p>
+<h3>Responsible</h3>
+<p id="en-resp">Michael Wüthrich, 8482 Sennhof, Switzerland · <a href="mailto:info@bergschatten.ch">info@bergschatten.ch</a></p>
+<h3>What is stored in your browser</h3>
+<p>So that the app looks the same the next time you open it, it stores in your browser’s local storage (localStorage): language, region, background, map view, last selected point, date, height above ground and the switches (profile, forest and buildings, hiking trails, 3D buildings). This stays on your device, is not transmitted and can be removed in your browser settings (“clear website data”). It only serves the function you asked for, so no consent (“cookie banner”) is needed.</p>
+<h3>Hosting</h3>
+<p>The site is hosted on GitHub Pages (GitHub Inc., USA). When you open it, GitHub necessarily receives your IP address and stores it for security purposes according to its privacy statement. See the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>.</p>
+<h3>Third-party data</h3>
+<p>Your browser loads maps, elevation data and search results directly from the respective providers. They see your IP address and which map area or search term you request:</p>
+<ul>
+  <li>swisstopo / geo.admin.ch (Switzerland) – maps, aerial imagery, elevation data, buildings, search</li>
+  <li>OpenTopography / San Diego Supercomputer Center (USA) – worldwide elevation data</li>
+  <li>OpenTopoMap (Germany) – worldwide map</li>
+  <li>komoot (Photon, Germany) – worldwide search, only if the Swiss search finds nothing or “Worldwide” is selected</li>
+</ul>
+<p>The privacy policies of these providers apply. Disclosure is necessary for the app to work. Some providers are located in the USA, where the level of data protection does not match that of Switzerland.</p>
+<h3>Location</h3>
+<p>Only when you tap ◎ does the browser ask for your location. It is used solely in the browser to move the map and is neither stored nor sent to bergschatten.ch (map providers only see the displayed area, as above).</p>
+<h3>Your rights</h3>
+<p>You may request information about data processed about you and its correction or deletion. As bergschatten.ch itself stores no personal data, in practice this mainly concerns the providers listed above. Contact: see above.</p>
+
+<h2 id="en-legal">Disclaimer & imprint</h2>
+<div class="note"><b>Not for safety decisions.</b> bergschatten.ch is a private hobby project. All information is provided without any warranty of correctness, completeness, timeliness or availability. Do not rely on this site for planning or carrying out tours, especially in the mountains (e.g. snow and avalanche conditions, icing, rockfall, getting back in daylight); use official information and your own judgement.</div>
+<p>All displays and computed values (sun times, shadows, sun hours, profiles) are <b>model approximations</b> based on third-party elevation data. They may be wrong, incomplete or outdated, e.g. due to errors or gaps in the data, simplifications in the computation, software bugs or outages of data sources. Use is <b>at your own risk</b>; you make your decisions yourself and on your own responsibility.</p>
+<p>Any liability for damage – in particular personal injury, property damage and financial loss – arising directly or indirectly from the use or non-use of this site, from incorrect, incomplete or misunderstood results or from its unavailability is excluded to the extent permitted by law. There is no entitlement to availability or further development of the site. Third-party content and data (maps, elevation data, search) are the responsibility of their providers.</p>
+<p>The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.</p>
+<h3>Imprint</h3>
+<p id="en-imp">Responsible for content and operation:<br>Michael Wüthrich<br>8482 Sennhof<br>Switzerland<br>Email: <a href="mailto:info@bergschatten.ch">info@bergschatten.ch</a><br>Private, non-commercial project.</p>
+<p class="mut"><small>As of November 2026</small></p>
+</main>
+
+<script>
+  // Sprache wie in der App (localStorage 'lang'), sonst Browsersprache
+  const get = () => { try { const v = JSON.parse(localStorage.getItem('lang')); if (v === 'de' || v === 'en') return v; } catch {} return (navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en'; };
+  function show(l) {
+    document.getElementById('de').hidden = l !== 'de'; document.getElementById('en').hidden = l !== 'en';
+    document.documentElement.lang = l;
+    document.title = l === 'de' ? 'Hilfe, Datenschutz & Impressum – bergschatten.ch' : 'Help, privacy & imprint – bergschatten.ch';
+    document.getElementById('l-de').setAttribute('aria-pressed', l === 'de'); document.getElementById('l-en').setAttribute('aria-pressed', l === 'en');
+  }
+  function set(l) { try { localStorage.setItem('lang', JSON.stringify(l)); } catch {} show(l); }
+  document.getElementById('l-de').onclick = () => set('de');
+  document.getElementById('l-en').onclick = () => set('en');
+  // Anker aus der App (#datenschutz, #impressum, #hilfe) auf die Sprache abbilden
+  const l = get(); show(l);
+  const map = { hilfe: 'start', help: 'start', datenschutz: 'privacy', privacy: 'privacy', impressum: 'legal', imprint: 'legal' };
+  const h = location.hash.slice(1);
+  if (map[h]) addEventListener('load', () => setTimeout(() => document.getElementById(`${l}-${map[h]}`)?.scrollIntoView(), 0));
+</script>
+</body>
+</html>

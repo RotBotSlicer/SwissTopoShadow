@@ -2,6 +2,7 @@
 
 Schattenwurf durch das Gelände über den Tagesverlauf, berechnet aus den Höhenmodellen von swisstopo.
 
+- **Hilfe, Datenschutz & Impressum:** `web/hilfe.html` (DE/EN), verlinkt in der Fusszeile.
 - **Sprache:** Deutsch/Englisch unten rechts (DE · EN), Voreinstellung nach Browsersprache.
 - **Suche (Lupe oben links):** Orte, Berge, Hütten und Adressen. Schweiz über die Suche von geo.admin.ch (swissNAMES3D),
   sonst weltweit über Photon (OpenStreetMap); ein Treffer ausserhalb der Schweiz schaltet auf „Weltweit“.

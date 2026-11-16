@@ -11,6 +11,14 @@ async function load() {
   return lib;
 }
 
+function matte(gltf) {
+  if (globalThis.__noMatte) return; // nur für den Test (Gegenprobe)
+  for (const m of gltf?.materials ?? []) {
+    const p = m.pbrMetallicRoughness ??= {};
+    p.roughnessFactor = 0.9; p.metallicFactor = 0;
+  }
+}
+
 export class Buildings {
   constructor(map) { this.map = map; this.overlay = null; this.on = false; }
 
@@ -31,6 +39,9 @@ export class Buildings {
           tileset: { maximumScreenSpaceError: 24, maximumMemoryUsage: 96, viewDistanceScale: 1.5 },
         },
         onTileError: e => console.warn('Gebäude-Kachel', e?.message ?? e),
+        // Die swisstopo-Kacheln haben roughnessFactor 0 (spiegelglatt). Mit Sonnenlicht ergibt das in der PBR-Beleuchtung
+        // reinweisse Flächen (Glanzpunkt ohne Ausdehnung). Matt machen, bevor deck.gl die Kachel zeichnet.
+        onTileLoad: tile => matte(tile?.content?.gltf),
         ...props,
       });
       this.overlay = new MapboxOverlay({ interleaved: true, layers: [] });

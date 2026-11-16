@@ -150,7 +150,8 @@ export class ShadowRenderer {
     gl.uniform2fv(this.u['uOrig[0]'], orig); gl.uniform1fv(this.u['uRes[0]'], res);
     gl.uniform1fv(this.u['uUntil[0]'], until); gl.uniform2iv(this.u['uSize[0]'], size);
     gl.uniform1i(this.u.uNL, terrain.levels.length);
-    gl.uniform1i(this.u.uGround, terrain.groundLevel ?? 0);
+    this.groundLevel = terrain.groundLevel ?? 0;
+    gl.uniform1i(this.u.uGround, this.groundLevel);
   }
 
   /** grid: {w, h, coords:Float64Array(2wh) LV95 je Pixel, Zeile 0 = oben}  oder {x0,y0,res,w,h} (LV95-Gitter) */
@@ -214,7 +215,11 @@ export class ShadowRenderer {
     gl.disable(gl.BLEND);
     gl.uniform4f(this.u.uShadow, c[0] * c[3], c[1] * c[3], c[2] * c[3], c[3]);
     this._sun(sunAz, sunEl, opts);
+    // opts.ground: Level für die Standorthöhe überschreiben (0 = Oberfläche: Dächer/Baumkronen statt Boden)
+    const g = opts.ground != null && opts.ground !== this.groundLevel;
+    if (g) gl.uniform1i(this.u.uGround, opts.ground);
     this._draw(0, false);
+    if (g) gl.uniform1i(this.u.uGround, this.groundLevel);
   }
 
   /** Maske besonnt (1) / Schatten (0), Zeile 0 = oben (wie grid). */

@@ -88,7 +88,7 @@ function setRegion(r) {
   region = r; store.set('region', r);
   // Ausschnitt und Punkt gehören zum alten Gebiet
   mv.removeOverlay(); for (const k in renderers) delete renderers[k];
-  area = null; chartMarkU = null; $('timebox').hidden = true; $('legend').hidden = true; $('area-status').textContent = '';
+  area = null; buildings?.setShadowMaps([]); chartMarkU = null; $('timebox').hidden = true; $('legend').hidden = true; $('area-status').textContent = '';
   applyRegion();
   if (pointTerrain) showPoint(pointTerrain.lat, pointTerrain.lon);
 }
@@ -540,6 +540,7 @@ function draw() {
     $('legend').hidden = mode !== 'hours';
     if (mode === 'hours') {
       $('timelbl').textContent = t('day');
+      buildings?.setShadowMaps([]);
       const mx = suns.length * STEP_MIN / 60;
       $('legend').innerHTML = `<span>0 h</span><span class="ramp" style="background:linear-gradient(90deg,#29337a,#338c8c,#f2d94d,#ed731a)"></span><span>${mx.toFixed(1)} h</span>`;
       if (hours === null) computeHours(mx);
@@ -549,7 +550,18 @@ function draw() {
     const i = +$('time').value, s = suns[i];
     if (!s) return;
     TZ = area.tz;
-    for (const L of area.layers) { const t = L.suns[i]; L.renderer.renderShadow(t.az, t.el, { rMax: R_MAX, grad: t.grad }); }
+    for (const L of area.layers) {
+      const t = L.suns[i], o = { rMax: R_MAX, grad: t.grad };
+      // Für die 3D-Häuser: Schatten auf der Oberfläche (Standort Dach statt Boden), nur im Nahbereich mit Oberflächenmodell
+      if (buildings?.on && L === area.near && L.terrain.groundLevel > 0) {
+        L.renderer.renderShadow(t.az, t.el, { ...o, ground: 0, eye: 0.3 });
+        const c = L.renderer.canvas, sc = (L.surf ??= document.createElement('canvas'));
+        if (sc.width !== c.width || sc.height !== c.height) { sc.width = c.width; sc.height = c.height; }
+        const g = sc.getContext('2d'); g.clearRect(0, 0, sc.width, sc.height); g.drawImage(c, 0, 0);
+        L.surfI = i;
+      }
+      L.renderer.renderShadow(t.az, t.el, o);
+    }
     mv.overlayChanged();
     updateBuildingSun();
     selectedMinute = (s.u - dayStart($('date').value)) / 60;
@@ -598,13 +610,18 @@ function updateBuildingSun() {
   const u = s ? s.u : dayStart($('date').value) + 60 * (selectedMinute ?? 12 * 60);
   const c = mv.center(), p = sunPosition(u, c.lat, c.lon);
   buildings.setSun(p.az, p.el);
+  // unsere Schattenkarte auch auf die Häuser (Nahbereich zuerst); nicht im Modus Sonnenstunden
+  // Nahbereich: Oberflächen-Schatten (Dächer), sonst nichts – die Bodenkarte hätte unter jedem Dach «Schatten»
+  const near = area?.near, ok = s && $('mode').value !== 'hours' && (near?.terrain.groundLevel > 0 ? near.surfI === i : true);
+  const maps = ok ? [{ canvas: near.surf ?? near.renderer.canvas, b: near.b }, ...area.layers.filter(L => L !== near).map(L => ({ canvas: L.renderer.canvas, b: L.b }))] : [];
+  buildings.setShadowMaps(maps);
 }
 async function applyBuildings() {
   $('bld-row').hidden = !(isCH() && mv.is3D);
   const want = $('bld').checked && isCH() && mv.is3D;
   if (!want && !buildings) return;
   if (!buildings) { const { Buildings } = await import('./buildings3d.js'); buildings ??= new Buildings(mv.map); }
-  try { await buildings.set(want); updateBuildingSun(); } catch (e) { console.error(e); status(t('error', { m: e.message })); }
+  try { await buildings.set(want); if (want && area) draw(); else updateBuildingSun(); } catch (e) { console.error(e); status(t('error', { m: e.message })); }
 }
 $('bld').checked = store.get('buildings3d') ?? true;
 $('bld').onchange = () => { store.set('buildings3d', $('bld').checked); applyBuildings(); };
@@ -718,4 +735,4 @@ showLang();
   if (p0 && Number.isFinite(p0.lat) && Number.isFinite(p0.lon)) mv.ready.then(() => showPoint(p0.lat, p0.lon));
 }
 
-window.__app = { mv, setView: (lat, lon, z) => mv.setView(lat, lon, z), get area() { return area; }, get suns() { return suns; }, get point() { return pointTerrain; }, showPoint, computeArea, setRegion };
+window.__app = { mv, setView: (lat, lon, z) => mv.setView(lat, lon, z), get area() { return area; }, get suns() { return suns; }, get point() { return pointTerrain; }, showPoint, computeArea, setRegion, shadeDebug: d => import('./buildings3d.js').then(m => m._shadeDebug(d)) };

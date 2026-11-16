@@ -11,7 +11,8 @@ def walls(png):  # helle, gelbliche Wandpixel (Luftbild hat davon kaum welche): 
     im = Image.open(io.BytesIO(png)).convert("RGB"); v = []
     for r, g, b in im.get_flattened_data():
         if r > 150 and g > 140 and abs(r - g) < 30 and 30 <= r - b <= 120: v.append((r + g + b) / 3)
-    return len(v), round(sum(v) / max(1, len(v)), 1)
+    white = sum(1 for r, g, b in im.crop((60, 0, 840, 380)).get_flattened_data() if r > 248 and g > 248 and b > 245)  # überbelichtet (ohne Knöpfe/Menü)
+    return len(v), round(sum(v) / max(1, len(v)), 1), white
 with sync_playwright() as p:
     br = p.chromium.launch(executable_path="/usr/bin/google-chrome", headless=True, args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
                            proxy={"server": os.environ["HTTPS_PROXY"], "bypass": "127.0.0.1"})
@@ -32,5 +33,6 @@ with sync_playwright() as p:
         res[bearing] = walls(shot); print(bearing, res[bearing], errs, flush=True)
         pg.close()
     print("helle Wandpixel – Südfassaden (Blick N):", res[0][0], "| Nordfassaden (Blick S):", res[180][0])
-    assert res[0][0] > 3 * res[180][0] + 50, "Südfassaden mittags nicht heller als Nordfassaden"
+    assert max(res[0][2], res[180][2]) < 400, f"überbelichtete Dächer/Wände: {res[0][2]}, {res[180][2]} Pixel reinweiss"
+    assert res[0][0] > 2 * res[180][0] + 50, "Südfassaden mittags nicht heller als Nordfassaden"
     br.close()

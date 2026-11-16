@@ -55,8 +55,8 @@ export class Buildings {
     // im Test hellt [0, -1, ·] die Südfassaden auf und [0, 0, 1] die Dächer. (Die SunLight von deck.gl zeigte hier verkehrt.)
     const e = Math.max(el, 0.5) * r, a = az * r;
     const effect = new LightingEffect({
-      sky: new AmbientLight({ color: [235, 240, 255], intensity: 0.4 + 0.2 * day }),
-      sun: new DirectionalLight({ color: [255, 244, 225], intensity: el > -0.8 ? 0.6 + 2.6 * day : 0,
+      sky: new AmbientLight({ color: [235, 240, 255], intensity: 0.45 + 0.1 * day }),
+      sun: new DirectionalLight({ color: [255, 244, 225], intensity: el > -0.8 ? 0.3 + 1.8 * day : 0, // nicht zu stark: helle Flachdächer laufen sonst ins Weisse
         direction: [Math.sin(a) * Math.cos(e), Math.cos(a) * Math.cos(e), Math.sin(e)] }),
     });
     this.overlay.setProps({ effects: [effect] });
